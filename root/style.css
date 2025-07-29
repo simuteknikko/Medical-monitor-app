@@ -1,0 +1,612 @@
+/* Custom CSS for MedicalMonitor - GRID LAYOUT + UNIFORM Large Vitals */
+/* VERSION: UI Enhancements for Fullscreen & Alarms (v2.6 - Fullscreen Layout Overhaul) */
+
+/* --- Perus Body ja Sivun Kääre --- */
+body {
+  background-color: #1c1e22;
+  color: #e8eaed;
+  font-family: "Roboto", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  overscroll-behavior-y: contain;
+  margin: 0;
+  padding: 0;
+  line-height: 1.55;
+}
+.page-wrapper {
+  padding: 12px 18px 30px 18px;
+}
+h1 {
+  color: #76c7c0;
+  font-size: 2.1rem;
+  font-weight: 300;
+  margin-top: 1rem;
+  margin-bottom: 1.8rem;
+  transition: display 0.3s ease;
+  text-shadow: 1px 1px 4px rgba(0,0,0,0.3);
+}
+
+/* --- Monitorin kääre --- */
+.monitor-wrapper {
+  max-width: 1050px;
+  margin: 18px auto 0 auto;
+  transition: max-width 0.35s ease, margin 0.35s ease, padding 0.35s ease;
+}
+
+/* --- Monitorin näyttöalue --- */
+.monitor-display {
+  background-color: #0f1115;
+  border: 1px solid #30343c;
+  border-radius: 10px;
+  padding: 10px; /* Default padding */
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0,0,0,0.2);
+  height: auto; /* Default height */
+  display: flex;
+  flex-direction: column; /* Stack parameter rows vertically */
+  transition: border 0.3s ease, padding 0.3s ease, border-radius 0.3s ease, max-width 0.3s ease, margin 0.3s ease, width 0.3s ease, height 0.3s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* --- Yksittäinen aaltomuotoalueen peruscontainer --- */
+.waveform-container {
+  padding: 6px 12px;
+  background-color: #14171c;
+  border: 1px solid #25292e;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.25), 0 1px 1px rgba(0,0,0,0.1);
+}
+
+/* --- GRID LAYOUT KÄYRILLE (Normaalitila) --- */
+.waveform-grid-container {
+  display: grid;
+  grid-template-rows: auto 1fr auto; /* Title, Main Content (Chart + Vitals), Footer */
+  grid-template-columns: minmax(0, 2.8fr) 1.2fr; /* Chart area, Vitals area */
+  gap: 0 12px;
+  min-height: 155px;
+  padding: 0;
+  flex-grow: 1;
+  height: 100%;
+}
+#etco2-container.waveform-grid-container {
+    min-height: 165px;
+}
+
+.waveform-title-area {
+  grid-column: 1 / 3;
+  grid-row: 1 / 2;
+  padding: 7px 14px 5px 14px;
+  border-bottom: 1px solid #363b42;
+  display: flex;
+  align-items: center;
+}
+.chart-area { /* Normaalitilassa */
+  grid-column: 1 / 2;
+  grid-row: 2 / 3; /* Sijoitetaan toiselle riville */
+  min-height: 80px;
+  height: 100%;
+  overflow: hidden;
+  background-color: #000000;
+  border-radius: 4px;
+  margin: 4px 0;
+  box-shadow: inset 0 0 5px rgba(0,0,0,0.3);
+}
+.vitals-area { /* Normaalitilassa */
+  grid-column: 2 / 3;
+  grid-row: 2 / 3; /* Sijoitetaan toiselle riville, käyrän viereen */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-end;
+  padding: 6px 14px 6px 0;
+  background-color: #121519;
+  border-left: 1px solid #2b2f35;
+  overflow: hidden;
+  border-radius: 0 4px 4px 0;
+  transition: box-shadow 0.3s ease-in-out, background-color 0.3s ease;
+}
+.waveform-footer-area {
+  grid-column: 1 / 3;
+  grid-row: 3 / 4;
+  padding: 5px 14px 7px 14px;
+  text-align: right;
+  border-top: 1px solid #363b42;
+}
+.waveform-title {
+  font-size: 1.1rem;
+  margin: 0;
+  font-weight: 400;
+  color: #d1d5db;
+  white-space: nowrap;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+}
+.ecg-color-icon { color: var(--ecg-color, #00ff00); }
+.spo2-color-icon, .abp-color-icon, .etco2-color-icon { display: inline-block; width: 0.85em; height: 0.85em; vertical-align: middle; margin-right: 0.55em; border-radius: 3px; box-shadow: 0 0 2px rgba(0,0,0,0.5);}
+.spo2-color-icon { background-color: var(--spo2-color, #00ffff); }
+.abp-color-icon { background-color: var(--abp-color, #ff0000); }
+.etco2-color-icon { background-color: var(--etco2-color, #ffff00); }
+
+.vitals-numeric {
+  font-weight: 500;
+  text-align: right;
+  line-height: 1.0;
+  color: #ffffff;
+  white-space: nowrap;
+  font-size: clamp(1.8rem, 4.8vw, 3.2rem);
+  transition: color 0.3s ease, font-size 0.3s ease, text-shadow 0.3s ease;
+}
+#ecg-container .vitals-numeric { color: var(--ecg-color, #00ff00); margin-top: 0; }
+#spo2-container .vitals-numeric { color: var(--spo2-color, #00ffff); }
+#abp-container .vitals-numeric { color: var(--abp-color, #ff0000); }
+#etco2-container .vitals-numeric { color: var(--etco2-color, #ffff00); }
+
+.vitals-numeric .unit {
+  font-size: clamp(0.6rem, 1.7vw, 1.05rem);
+  font-weight: 300;
+  margin-left: 5px;
+  color: #adb5bd;
+  vertical-align: baseline;
+}
+.vitals-numeric .unit-multiline {
+  font-size: clamp(0.6rem, 1.7vw, 0.95rem);
+  font-weight: 300;
+  display: block;
+  color: #adb5bd;
+  margin-top: 2px;
+  line-height: 1.1;
+}
+.rhythm-label {
+  font-size: clamp(0.75rem, 2.2vw, 0.85rem);
+  color: #a0a5ad;
+}
+#etco2-container .waveform-footer-area .rr-label-large {
+  font-size: clamp(1.2rem, 3.3vw, 1.5rem);
+  font-weight: 500;
+  color: #d8dde2;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.ct-chart {
+  width: 100%;
+  height: 100%;
+  background-color: #000000;
+}
+
+/* --- Ohjausalueen tyylit --- */
+.controls-area.centered-controls {
+    background-color: #212529;
+    border-radius: 10px;
+    margin: 30px auto 0 auto;
+    max-width: 1050px;
+    padding: 25px;
+    box-shadow: 0 6px 15px rgba(0,0,0,0.35);
+    transition: display 0.3s ease;
+}
+.controls-area h2 { color: #f8f9fa; font-weight: 300; font-size: 1.6rem; }
+.accordion-button { background-color: #343a40; color: #f8f9fa; border-radius: 0 !important; border: 1px solid #495057; }
+.accordion-button:not(.collapsed) { background-color: #76c7c0; color: #1c1e22; }
+.accordion-button:not(.collapsed)::after { background-image: var(--bs-accordion-btn-active-icon); }
+.accordion-button:focus { box-shadow: 0 0 0 0.2rem rgba(118, 199, 192, 0.3); }
+.accordion-item { border: 1px solid #495057; background-color: #2c3036; }
+.accordion-body { background-color: #262a2e; color: #dee2e6; }
+.form-select, .form-range, .form-control-static, .form-control { background-color: #3b4046; color: #fff; border: 1px solid #5a6169; border-radius: 0.3rem; padding: 0.45rem 0.9rem; }
+.form-control-static { background-color: transparent; border: none; padding-left: 0; }
+.form-select:focus, .form-range:focus, .form-control:focus { background-color: #42484e; border-color: #76c7c0; box-shadow: 0 0 0 0.2rem rgba(118, 199, 192, 0.3); color: #fff; }
+label { margin-bottom: 0.45rem; font-size: 0.98rem; color: #ced4da; }
+.slider-control-group { display: flex; align-items: center; }
+.slider-control-group .form-range { flex-grow: 1; margin: 0 0.7rem; height: 1.35rem; }
+.slider-control-group .badge { font-weight: 500; font-size: 1rem; padding: 0.7em 0.8em; min-width: 70px; text-align: center; }
+.slider-control-group .input-group-text { font-size: 0.9rem; padding: 0.7em 0.8em; background-color: #3b4046; border-color: #5a6169; color: #ced4da; }
+.adjust-btn { padding: 0.6rem 1rem; font-size: 1.2rem; min-width: 52px; min-height: 44px; line-height: 1; background-color: #495057; border-color: #5a6169; color: #e8eaed; display: inline-flex; align-items: center; justify-content: center; }
+.adjust-btn:hover { background-color: #52585f; color: #fff; }
+.adjust-btn:active { background-color: #5a6169; }
+.adjust-btn i { vertical-align: middle; }
+#hr-slider::-webkit-slider-thumb { background: var(--ecg-color, #00ff00); } #hr-slider::-moz-range-thumb { background: var(--ecg-color, #00ff00); } #hr-slider::-ms-thumb { background: var(--ecg-color, #00ff00); }
+#spo2-slider::-webkit-slider-thumb { background: var(--spo2-color, #00ffff); } #spo2-slider::-moz-range-thumb { background: var(--spo2-color, #00ffff); } #spo2-slider::-ms-thumb { background: var(--spo2-color, #00ffff); }
+.abp-slider::-webkit-slider-thumb { background: var(--abp-color, #ff0000); } .abp-slider::-moz-range-thumb { background: var(--abp-color, #ff0000); } .abp-slider::-ms-thumb { background: var(--abp-color, #ff0000); }
+.abp-badge { background-color: var(--abp-color, #ff0000) !important; }
+.etco2-slider::-webkit-slider-thumb { background: var(--etco2-color, #ffff00); } .etco2-slider::-moz-range-thumb { background: var(--etco2-color, #ffff00); } .etco2-slider::-ms-thumb { background: var(--etco2-color, #ffff00); }
+.etco2-badge { background-color: var(--etco2-color, #ffff00) !important; color: #1c1e22 !important; }
+.temp-slider::-webkit-slider-thumb { background: var(--temp-color, #ffc107); } .temp-slider::-moz-range-thumb { background: var(--temp-color, #ffc107); } .temp-slider::-ms-thumb { background: var(--temp-color, #ffc107); }
+.temp-badge { background-color: var(--temp-color, #ffc107) !important; color: #1c1e22 !important; }
+.form-range::-webkit-slider-runnable-track { background-color: #5a6169; height: 0.6rem; border-radius: 0.3rem; }
+.form-range::-moz-range-track { background-color: #5a6169; height: 0.6rem; border-radius: 0.3rem; }
+#activate-button, #update-vitals-button, #toggle-alarm-sounds-btn { padding: 11px 24px; font-size: 1.1rem; font-weight: 500; transition: background-color 0.2s ease, opacity 0.2s ease, color 0.2s ease, box-shadow 0.2s ease; border-radius: 5px;}
+#activate-button.btn-success { background-color: #5cb85c; border-color: #5cb85c; box-shadow: 0 2px 5px rgba(0,0,0,0.25); }
+#activate-button.btn-success:hover { background-color: #4cae4c; border-color: #45a045; }
+#activate-button.btn-danger { background-color: #d9534f; border-color: #d9534f; box-shadow: 0 2px 5px rgba(0,0,0,0.25); }
+#activate-button.btn-danger:hover { background-color: #d43f3a; border-color: #c9302c; }
+#update-vitals-button { background-color: #0275d8; border-color: #0275d8; color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.25); }
+#update-vitals-button:hover { background-color: #025aa5; border-color: #01549b;}
+#update-vitals-button:disabled { background-color: #555c63; border-color: #555c63; opacity: 0.7; cursor: not-allowed; box-shadow: none; }
+#pending-changes-alert { padding: 0.65rem 1.2rem; font-size: 1rem; }
+#etco2-unit-switch.form-check-input:checked { background-color: var(--etco2-color, #ffff00); border-color: var(--etco2-color, #ffff00); }
+#etco2-unit-switch.form-check-input:focus { box-shadow: 0 0 0 0.2rem rgba(255, 255, 0, 0.3); }
+#temp-unit-switch.form-check-input:checked { background-color: var(--temp-color, #ffc107); border-color: var(--temp-color, #ffc107); }
+#temp-unit-switch.form-check-input:focus { box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.3); }
+#toggle-alarm-sounds-btn { padding: 9px 15px; font-size: 0.95rem;}
+.shock-description { color: #b0b5bc; }
+.ct-chart { padding: 0; }
+.ct-point { stroke-width: 0 !important; }
+.ct-grid { stroke: none; }
+.ct-axis-x line, .ct-axis-y line { stroke: none; }
+.ct-label { fill: none; }
+#ecg-chart-container .ct-series-a .ct-line { stroke: var(--ecg-color, #00ff00); stroke-width: 1.3px; stroke-linecap: round; stroke-linejoin: round; }
+#spo2-chart-container .ct-series-a .ct-line { stroke: var(--spo2-color, #00ffff); stroke-width: 1.7px; stroke-linecap: round; stroke-linejoin: round; }
+#abp-chart-container .ct-series-a .ct-line { stroke: var(--abp-color, #ff0000); stroke-width: 1.7px; stroke-linecap: round; stroke-linejoin: round; }
+#etco2-chart-container .ct-series-a .ct-line { stroke: var(--etco2-color, #ffff00); stroke-width: 1.7px; stroke-linecap: round; stroke-linejoin: round; }
+
+.vitals-only-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 5px 10px;
+    height: 100%;
+}
+.vitals-only-container .waveform-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: auto;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #363b42;
+    flex-shrink: 0;
+}
+.vitals-only-container .header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.vitals-only-container .waveform-footer {
+    margin-top: 4px;
+    flex-shrink: 0;
+}
+.nibp-color-icon { color: var(--nibp-color, #ff0000); }
+.temp-color-icon { color: var(--temp-color, #ffc107); }
+
+#nibp-container .vitals-numeric {
+    color: var(--nibp-color, #ff0000);
+    font-size: clamp(1.7rem, 3.8vw, 2.2rem);
+    line-height: 1.0;
+}
+#temp-container .vitals-numeric {
+    color: var(--temp-color, #ffc107);
+    font-size: clamp(1.8rem, 4.1vw, 2.4rem);
+    line-height: 1.0;
+}
+#temp-container .vitals-numeric .unit {
+    vertical-align: super;
+    font-size: clamp(0.7rem, 2vw, 1.15rem);
+}
+#start-nibp-button.btn-info { background-color: #5bc0de; border-color: #46b8da; color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.2);}
+#start-nibp-button.btn-info:hover { background-color: #31b0d5; border-color: #269abc; }
+
+/* --- HÄLYTYSTYLIEN MUUTOKSET (v2.1) --- */
+.alarm-active-low, .alarm-active-high {}
+
+#ecg-container-wrapper.alarm-active-low .vitals-area,
+#spo2-container-wrapper.alarm-active-low .vitals-area,
+#abp-container-wrapper.alarm-active-low .vitals-area,
+#etco2-container-wrapper.alarm-active-low .vitals-area {
+  animation: subtle-glow-low 1.2s infinite alternate;
+  --alarm-glow-color: rgba(255, 60, 60, 0.6);
+  background-color: rgba(40, 10, 10, 0.3);
+}
+
+#ecg-container-wrapper.alarm-active-high .vitals-area,
+#spo2-container-wrapper.alarm-active-high .vitals-area,
+#abp-container-wrapper.alarm-active-high .vitals-area,
+#etco2-container-wrapper.alarm-active-high .vitals-area {
+  animation: subtle-glow-high 1.2s infinite alternate;
+  --alarm-glow-color: rgba(255, 175, 60, 0.7);
+  background-color: rgba(40, 25, 10, 0.3);
+}
+
+@keyframes subtle-glow-low {
+  from { box-shadow: 0 0 6px 2px var(--alarm-glow-color), inset 0 0 4px rgba(255,0,0,0.25); }
+  to   { box-shadow: 0 0 14px 4px var(--alarm-glow-color), inset 0 0 8px rgba(255,0,0,0.35); }
+}
+@keyframes subtle-glow-high {
+  from { box-shadow: 0 0 6px 2px var(--alarm-glow-color), inset 0 0 4px rgba(255,165,0,0.25); }
+  to   { box-shadow: 0 0 14px 4px var(--alarm-glow-color), inset 0 0 8px rgba(255,165,0,0.35); }
+}
+
+#hr-value.alarm-value-active,
+#spo2-value.alarm-value-active,
+#abp-sys-value.alarm-value-active,
+#etco2-value.alarm-value-active {
+  color: #ffff66 !important;
+  font-weight: 600;
+  text-shadow: 0 0 7px #ffff66, 0 0 12px rgba(255,255,102,0.6);
+}
+#abp-dia-value.alarm-value-active, #abp-mean-value.alarm-value-active {
+    color: #ffff66 !important;
+    font-weight: 600;
+    text-shadow: 0 0 7px #ffff66, 0 0 12px rgba(255,255,102,0.6);
+}
+
+#toggle-alarm-sounds-btn.btn-warning { background-color: #f0ad4e; border-color: #eea236; color: #1c1e22; }
+#toggle-alarm-sounds-btn.btn-warning:hover { background-color: #ec971f; border-color: #d58512; }
+#toggle-alarm-sounds-btn.btn-secondary { background-color: #6c757d; border-color: #6c757d; }
+#toggle-alarm-sounds-btn.btn-secondary:hover { background-color: #5a6268; border-color: #545b62; }
+.visually-hidden-focusable:not(:focus):not(:focus-within) {
+  position: absolute !important; width: 1px !important; height: 1px !important;
+  padding: 0 !important; margin: -1px !important; overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important;
+}
+#session-controls {
+  background-color: #2a2e33; padding: 20px; border-radius: 0 0 8px 8px;
+  margin-top: -1px; border: 1px solid #424850; border-top: none;
+}
+#session-controls .form-label.small { margin-bottom: 0.35rem; color: #c8cdd2; }
+#session-controls .form-control-sm { font-size: 0.92rem; padding: 0.35rem 0.65rem; }
+#session-controls .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.92rem; }
+#session-controls .form-check-label.small { font-size: 0.92rem; color: #e8eaed; }
+#session-controls .form-check-input { background-color: #495057; border-color: #5a6169; }
+#session-controls .form-check-input:checked { background-color: #0275d8; border-color: #026ac1; }
+#session-controls .form-check-input:focus { box-shadow: 0 0 0 0.2rem rgba(2, 117, 216, 0.3); }
+#connection-status-label { font-size: 0.88rem; padding: 0.48em 0.68em; }
+#session-id-input:disabled {
+  background-color: #e9ecef; color: #495057; opacity: 1; border-color: #ced4da;
+}
+#session-id-input::placeholder { color: #bbb; opacity: 1; }
+body.monitor-role #controlAccordion { display: none; }
+#fullscreen-button { display: none; vertical-align: middle; }
+body.monitor-role #fullscreen-button { display: inline-block; }
+
+/* --- KOKO NÄYTÖN TILA (UUDELLEENSUUNNITELTU v2.6 - Fullscreen Layout Overhaul) --- */
+body.fullscreen-active > .page-wrapper > h1,
+body.fullscreen-active > .page-wrapper > .controls-area {
+    display: none !important;
+}
+#monitor-wrapper-fullscreen-target:fullscreen,
+#monitor-wrapper-fullscreen-target:-webkit-full-screen,
+#monitor-wrapper-fullscreen-target:-moz-full-screen,
+#monitor-wrapper-fullscreen-target:-ms-fullscreen {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background-color: #000000 !important;
+    overflow: hidden !important;
+    display: flex !important; /* Mahdollistaa .monitor-display keskittämisen ja täyttämisen */
+    box-sizing: border-box;
+}
+
+body.fullscreen-active .monitor-display {
+    width: 100%;
+    height: 100%;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 5px !important; /* Pieni padding koko näytön sisällölle */
+    margin: 0 !important;
+    display: grid;
+    /* 5 riviä: 4 pääparametria ja 1 NIBP/TEMP-parille */
+    /* Annetaan NIBP/TEMP-riville suhteellisesti vähemmän tilaa, mutta varmistetaan minimikorkeus */
+    grid-template-rows: 1fr 1fr 1fr 1fr minmax(80px, 0.6fr);
+    gap: 5px !important; /* Pieni väli parametririvien välillä */
+    box-shadow: none !important;
+    overflow: hidden;
+}
+
+/* Varmistetaan, että .col-12 (parametririvit) täyttävät grid-rivinsä korkeuden */
+body.fullscreen-active .monitor-display > .col-12 {
+    display: flex;
+    flex-direction: column; /* Jotta .waveform-container voi kasvaa sen sisällä */
+    min-height: 0; /* Tärkeä grid-itemeille ylivuodon estämiseksi */
+    overflow: hidden;
+}
+/* NIBP/TEMP-rivin sisäinen .row-elementti */
+body.fullscreen-active .monitor-display > .col-12 > .row {
+    display: flex;
+    flex-grow: 1;
+    min-height: 0;
+    gap: 5px; /* Väli NIBP ja TEMP lohkojen välille */
+}
+/* NIBP/TEMP-sarakkeet (.col-6) */
+body.fullscreen-active .monitor-display > .col-12 > .row > .col-6 {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex-basis: 0; /* Jakaa tilan tasaisesti .row sisällä */
+    flex-grow: 1;
+}
+
+/* Varmistetaan, että waveform-container ja vitals-only-container täyttävät vanhempansa */
+body.fullscreen-active .waveform-container,
+body.fullscreen-active .vitals-only-container {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    min-height: 0;
+    padding: 4px 8px; /* Pienennetty paddingia konteissa */
+}
+
+/* Palautetaan .waveform-grid-container vastaamaan normaalitilan asettelua */
+body.fullscreen-active .waveform-grid-container {
+    display: grid;
+    grid-template-rows: auto 1fr auto; /* Title, Main Content (Chart + Vitals), Footer */
+    /* Säädetään sarakkeiden leveyksiä: Käyrä saa enemmän tilaa, mutta numerotkin näkyvät */
+    grid-template-columns: minmax(200px, 3fr) minmax(150px, 1.2fr);
+    gap: 0 8px; /* Pieni väli käyrän ja numeroiden välillä */
+    min-height: 0;
+    padding: 0;
+    height: 100%;
+    flex-grow: 1;
+}
+body.fullscreen-active #etco2-container.waveform-grid-container {
+    grid-template-columns: minmax(200px, 2.8fr) minmax(160px, 1.4fr);
+}
+
+/* Käyräalueen ja vitaalialueen sijoittelu gridin sisällä */
+body.fullscreen-active .chart-area {
+    grid-column: 1 / 2;
+    grid-row: 2 / 3; /* Sijoitetaan toiselle riville */
+    height: 100%; /* Täyttää sille varatun grid-solun korkeuden */
+    min-height: 0; /* Poistetaan vanha minimikorkeus, annetaan gridin hallita */
+    overflow: hidden;
+    background-color: #000;
+    border-radius: 3px;
+    aspect-ratio: 10 / 1; /* Säädä tätä arvoa käyrien ulkonäön mukaan (leveys / korkeus) */
+                           /* Esim. 10/1 = 1000px leveä -> 100px korkea */
+                           /* Pienempi ensimmäinen numero = korkeampi käyrä suhteessa leveyteen */
+    max-width: 100%; /* Varmistaa, ettei ylitä sarakkeen leveyttä */
+    margin: auto 0; /* Keskittää pystysuunnassa, jos aspect-ratio rajoittaa */
+}
+body.fullscreen-active #etco2-chart-container.chart-area {
+    aspect-ratio: 9 / 1; /* ETCO2 voi olla hieman litteämpi */
+}
+
+body.fullscreen-active .vitals-area {
+    grid-column: 2 / 3;
+    grid-row: 2 / 3; /* Sijoitetaan toiselle riville, käyrän viereen */
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* Keskitetään numerot pystysuunnassa */
+    align-items: flex-end;
+    padding: 4px 10px 4px 0; /* Pienennetty paddingia */
+    height: 100%; /* Täyttää sille varatun tilan */
+}
+
+body.fullscreen-active .ct-chart { width: 100%; height: 100%; }
+
+/* Fonttikoot fullscreenissä, käytetään enemmän vh-yksiköitä */
+body.fullscreen-active .vitals-numeric { font-size: clamp(1.5rem, 3.5vh, 3rem); line-height: 1.0; } /* Pienennetty hieman */
+body.fullscreen-active #abp-container .vitals-numeric { font-size: clamp(1.4rem, 3.2vh, 2.8rem); }
+body.fullscreen-active #nibp-container .vitals-numeric { font-size: clamp(1.2rem, 2.8vh, 2.4rem); }
+body.fullscreen-active #temp-container .vitals-numeric { font-size: clamp(1.3rem, 2.9vh, 2.5rem); }
+body.fullscreen-active #etco2-container .waveform-footer-area .rr-label-large { font-size: clamp(1.1rem, 2.5vh, 1.7rem); }
+
+body.fullscreen-active .vitals-numeric .unit { font-size: clamp(0.5rem, 1vh, 0.9rem); }
+body.fullscreen-active .vitals-numeric .unit-multiline { font-size: clamp(0.5rem, 1vh, 0.8rem); line-height: 1.05; }
+body.fullscreen-active .waveform-title { font-size: clamp(0.75rem, 1.5vh, 1rem); padding: 2px 4px; }
+body.fullscreen-active .rhythm-label { font-size: clamp(0.6rem, 1.2vh, 0.8rem); }
+body.fullscreen-active .waveform-footer-area { padding: 2px 4px; }
+
+body.fullscreen-active .vitals-only-container { padding: 2px 4px; }
+body.fullscreen-active .vitals-only-container .waveform-header { padding-bottom: 2px; margin-bottom: 2px; }
+body.fullscreen-active .vitals-only-container .waveform-footer { margin-top: 2px; font-size: clamp(0.5rem, 1vh, 0.7rem); }
+
+body.fullscreen-active #nibp-container-wrapper,
+body.fullscreen-active #temp-container-wrapper {
+     flex-basis: 0; flex-grow: 1; max-width: 50%; display: flex;
+     flex-direction: column;
+     min-height: 0;
+}
+
+
+/* Responsiiviset säädöt normaaliin näkymään (ei fullscreen) */
+@media (min-width: 992px) { /* Desktop */
+    .vitals-numeric { font-size: clamp(2.5rem, 3.8vw, 3.1rem); }
+    #abp-container .vitals-numeric { line-height: 1.05; }
+    .waveform-grid-container { min-height: 160px; }
+    #etco2-container.waveform-grid-container { min-height: 175px; }
+    #etco2-container .waveform-footer-area .rr-label-large { font-size: clamp(1.35rem, 2.7vw, 1.55rem); }
+    #nibp-container .vitals-numeric { font-size: clamp(2rem, 3.2vw, 2.6rem); }
+    #temp-container .vitals-numeric { font-size: clamp(2.2rem, 3.4vw, 2.8rem); }
+}
+
+@media (max-width: 991.98px) { /* Tabletit */
+  .vitals-numeric { font-size: clamp(2rem, 4.1vw, 2.5rem); }
+  #abp-container .vitals-numeric { line-height: 1.0; }
+  .waveform-grid-container { min-height: 145px; grid-template-columns: minmax(0, 2.7fr) 1.3fr; }
+  #etco2-container.waveform-grid-container { min-height: 160px; grid-template-columns: minmax(0, 2.6fr) 1.4fr;}
+  .chart-area { min-height: 70px; }
+  .monitor-wrapper, .controls-area.centered-controls { max-width: 97%; }
+  #etco2-container .waveform-footer-area .rr-label-large { font-size: clamp(1.15rem, 3vw, 1.35rem); }
+  #nibp-container .vitals-numeric { font-size: clamp(1.7rem, 3.4vw, 2rem); }
+  #temp-container .vitals-numeric { font-size: clamp(1.8rem, 3.7vw, 2.2rem); }
+  .vitals-only-container { padding-top: 5px; padding-bottom: 5px; }
+}
+
+@media (max-width: 767.98px) { /* Pienet tabletit ja suuret puhelimet */
+   /* Palautetaan mobiilissa numerot käyrän alle, jos se toimii paremmin pienellä näytöllä */
+   .waveform-grid-container {
+       grid-template-rows: auto auto auto auto; /* Otsikko, Käyrä, Numerot, Jalka */
+       grid-template-columns: 1fr; /* Yksi sarake */
+       gap: 3px 0;
+       min-height: 0;
+       padding-bottom: 5px;
+    }
+   .waveform-title-area { grid-row: 1 / 2; grid-column: 1 / 2; border-bottom: none; padding: 5px 8px 2px 8px; }
+   .chart-area { grid-row: 2 / 3; grid-column: 1 / 2; min-height: 70px; aspect-ratio: unset; /* Poistetaan aspect-ratio mobiilissa */}
+   .vitals-area {
+       grid-row: 3 / 4; grid-column: 1 / 2;
+       border-left: none; border-top: 1px solid #2b2f35;
+       align-items: center;
+       padding: 4px 8px; background-color: transparent;
+       border-radius: 0;
+    }
+   .waveform-footer-area { grid-row: 4 / 5; grid-column: 1 / 2; text-align: center; padding: 2px 8px 4px 8px; border-top: none;}
+
+    .vitals-numeric { font-size: clamp(1.8rem, 5.5vw, 2.1rem); }
+    #abp-container .vitals-numeric { line-height: 1.0; }
+    h1 { font-size: 1.6rem; }
+    .monitor-wrapper, .controls-area.centered-controls { max-width: 100%; margin-top: 18px; }
+    .waveform-title { font-size: clamp(0.9rem, 2.7vw, 1.05rem); }
+    #activate-button, #update-vitals-button { font-size: 1rem; padding: 10px 18px; }
+    #etco2-container .waveform-footer-area .rr-label-large { font-size: clamp(1.05rem, 3.2vw, 1.25rem); }
+    #nibp-container .vitals-numeric { font-size: clamp(1.5rem, 4.8vw, 1.8rem); }
+    #temp-container .vitals-numeric { font-size: clamp(1.6rem, 5.1vw, 2rem); }
+    .vitals-only-container { padding-top: 4px; padding-bottom: 4px; }
+}
+
+@media (max-width: 575.98px) { /* Puhelimet */
+   .chart-area { min-height: 60px; aspect-ratio: unset; }
+   .vitals-numeric { font-size: clamp(1.5rem, 6.5vw, 1.8rem); }
+   .vitals-numeric .unit { font-size: clamp(0.55rem, 2.7vw, 0.8rem); margin-left: 4px;}
+   .vitals-numeric .unit-multiline { font-size: clamp(0.55rem, 2.7vw, 0.75rem); line-height: 1.0;}
+   #abp-container .vitals-numeric { line-height: 1.0; }
+   .waveform-title { font-size: clamp(0.8rem, 3vw, 0.9rem); }
+   .controls-area { padding: 15px; margin-top: 20px; }
+   label, .form-range ~ span.badge { font-size: 0.9rem; }
+   #activate-button, #update-vitals-button { font-size: 0.95rem; padding: 8px 14px; }
+   #etco2-container .waveform-footer-area .rr-label-large { font-size: clamp(0.9rem, 3.8vw, 1.15rem); }
+   #nibp-container-wrapper, #temp-container-wrapper { flex-basis: 50%; max-width: 50%; }
+   #nibp-container .vitals-numeric { font-size: clamp(1.3rem, 5.8vw, 1.6rem); }
+   #temp-container .vitals-numeric { font-size: clamp(1.4rem, 6.1vw, 1.7rem); }
+   .vitals-only-container { padding: 3px 6px; }
+   .vitals-only-container .waveform-header { padding-bottom: 3px; }
+   .vitals-only-container .waveform-footer { margin-top: 3px; font-size: 0.7rem; }
+}
+
+/* Matalat, leveät näytöt (esim. tablet landscape) - hienosäädetty */
+@media (max-height: 650px) and (min-width: 900px) {
+    body.fullscreen-active .monitor-display {
+        grid-template-rows: repeat(4, minmax(0, 1fr)) minmax(60px, 0.4fr);
+        gap: 2px !important;
+        padding: 2px !important;
+    }
+    body.fullscreen-active .waveform-grid-container {
+        grid-template-columns: minmax(180px, 2.8fr) minmax(130px, 1.2fr);
+        gap: 0 4px;
+    }
+    body.fullscreen-active #etco2-container.waveform-grid-container {
+        grid-template-columns: minmax(180px, 2.6fr) minmax(140px, 1.4fr);
+    }
+    body.fullscreen-active .chart-area {
+       min-height: 30px;
+       aspect-ratio: 14 / 1; /* Vielä litteämpi, mutta korkeus määräytyy grid-rivistä */
+       margin: auto 0;
+    }
+    body.fullscreen-active #etco2-chart-container.chart-area {
+        aspect-ratio: 11 / 1;
+    }
+
+    body.fullscreen-active .vitals-numeric { font-size: clamp(1.6rem, 3.5vh, 2.8rem); }
+    body.fullscreen-active #abp-container .vitals-numeric { font-size: clamp(1.5rem, 3.2vh, 2.6rem); }
+    body.fullscreen-active #nibp-container .vitals-numeric { font-size: clamp(1.3rem, 2.8vh, 2.3rem); }
+    body.fullscreen-active #temp-container .vitals-numeric { font-size: clamp(1.4rem, 2.9vh, 2.4rem); }
+    body.fullscreen-active #etco2-container .waveform-footer-area .rr-label-large { font-size: clamp(1.2rem, 2.5vh, 1.8rem); }
+    body.fullscreen-active .waveform-title { font-size: clamp(0.8rem, 1.6vh, 1rem); padding: 1px 3px; }
+    body.fullscreen-active .waveform-footer-area { padding: 1px 3px; }
+    body.fullscreen-active .vitals-only-container .waveform-footer { font-size: clamp(0.55rem, 1.1vh, 0.75rem); }
+}

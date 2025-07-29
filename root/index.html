@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Medical Monitor Simulator (Grid Layout)</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/chartist.js/latest/chartist.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    />
+    <link href="style.css" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="page-wrapper">
+      <h1 class="text-center my-3">Medical Monitor Simulator</h1>
+
+      <div class="monitor-wrapper" id="monitor-wrapper-fullscreen-target">
+         <div class="row monitor-display gx-2 gy-3">
+           <div class="col-12" id="ecg-container-wrapper">
+             <div class="waveform-container waveform-grid-container" id="ecg-container">
+               <div class="waveform-title-area"> <h3 class="waveform-title"> <i class="fas fa-heartbeat me-2 ecg-color-icon"></i>ECG </h3> </div>
+               <div class="chart-area ct-chart" id="ecg-chart-container"></div>
+               <div class="vitals-area"> <div class="vitals-numeric vitals-numeric-large"> <span id="hr-value">--</span> <span class="unit">bpm</span> </div> </div>
+               <div class="waveform-footer-area"> <span id="ecg-rhythm-display" class="rhythm-label">--</span> </div>
+              </div>
+            </div>
+            <div class="col-12" id="spo2-container-wrapper">
+              <div class="waveform-container waveform-grid-container" id="spo2-container">
+                <div class="waveform-title-area"> <h3 class="waveform-title"> <span class="spo2-color-icon"></span>SpO<sub>2</sub> </h3> </div>
+                <div class="chart-area ct-chart" id="spo2-chart-container"></div>
+                <div class="vitals-area"> <div class="vitals-numeric"> <span id="spo2-value">--</span> <span class="unit">%</span> </div> </div>
+                <div class="waveform-footer-area"> <span id="spo2-pr-label" class="rhythm-label">PR: --</span> </div>
+              </div>
+            </div>
+            <div class="col-12" id="abp-container-wrapper">
+              <div class="waveform-container waveform-grid-container" id="abp-container">
+                 <div class="waveform-title-area"> <h3 class="waveform-title"> <span class="abp-color-icon"></span>ABP </h3> </div>
+                 <div class="chart-area ct-chart" id="abp-chart-container"></div>
+                 <div class="vitals-area"> <div class="vitals-numeric"> <span id="abp-sys-value">--</span>/<span id="abp-dia-value">--</span> <span class="unit-multiline">(<span id="abp-mean-value">--</span>) mmHg</span> </div> </div>
+                 <div class="waveform-footer-area"> <span class="rhythm-label">&nbsp;</span> </div>
+               </div>
+            </div>
+            <div class="col-12" id="etco2-container-wrapper">
+              <div class="waveform-container waveform-grid-container" id="etco2-container">
+                 <div class="waveform-title-area"> <h3 class="waveform-title"> <span class="etco2-color-icon"></span>ETCO<sub>2</sub> </h3> </div>
+                 <div class="chart-area ct-chart" id="etco2-chart-container"></div>
+                 <div class="vitals-area"> <div class="vitals-numeric"> <span id="etco2-value">--</span> <span id="etco2-unit" class="unit">kPa</span> </div> </div>
+                 <div class="waveform-footer-area"> <span id="resp-rate-label" class="rhythm-label rr-label-large">RR: --</span> </div>
+               </div>
+            </div>
+            <div class="col-12">
+              <div class="row gx-2 gy-3">
+                <div class="col-6" id="nibp-container-wrapper">
+                  <div class="waveform-container vitals-only-container" id="nibp-container">
+                     <div class="waveform-header">
+                       <div class="header-left"> <h3 class="waveform-title"> <i class="fas fa-stethoscope me-2 nibp-color-icon"></i>NIBP </h3> </div>
+                       <div class="vitals-numeric nibp-numeric"> <span id="nibp-sys-value">--</span>/<span id="nibp-dia-value">--</span> <span class="unit-multiline">(<span id="nibp-mean-value">--</span>) mmHg</span> </div>
+                     </div>
+                     <div class="waveform-footer"> <span id="nibp-time-label" class="rhythm-label">Last: --:--</span> </div>
+                   </div>
+                </div>
+                <div class="col-6" id="temp-container-wrapper">
+                  <div class="waveform-container vitals-only-container" id="temp-container">
+                     <div class="waveform-header">
+                       <div class="header-left"> <h3 class="waveform-title"> <i class="fas fa-thermometer-half me-2 temp-color-icon"></i>TEMP </h3> </div>
+                       <div class="vitals-numeric temp-numeric"> <span id="temp-value">--</span><span id="temp-unit" class="unit">°C</span> </div>
+                     </div>
+                     <div class="waveform-footer"> <span class="rhythm-label">&nbsp;</span> </div>
+                   </div>
+                </div>
+              </div>
+            </div>
+         </div> </div> <div class="controls-area centered-controls mt-4 p-3 bg-dark rounded">
+        <h2 class="text-center mb-3 text-light">Simulation Controls</h2>
+
+        <div class="text-center mb-4">
+          <button id="activate-button" class="btn btn-success">
+            Activate Monitor
+          </button>
+          <button id="toggle-alarm-sounds-btn" class="btn btn-secondary btn-sm ms-2">Mute Alarms</button>
+          <div class="d-inline-block ms-2">
+            <div class="input-group">
+              <select class="form-select form-select-sm" id="update-delay-select" aria-label="Update delay" style="max-width: 90px;">
+                  <option value="0" selected>Now</option>
+                  <option value="5000">5 s</option>
+                  <option value="15000">15 s</option>
+                  <option value="30000">30 s</option>
+              </select>
+              <button
+                id="update-vitals-button"
+                class="btn btn-primary"
+                disabled
+              >
+                Update Vitals
+              </button>
+            </div>
+          </div>
+          <div
+            id="pending-changes-alert"
+            class="alert alert-warning mt-2 d-none"
+            role="alert"
+          >
+            Pending changes - Click "Update Vitals" to apply after selected delay.
+          </div>
+        </div>
+
+        <div class="accordion" id="controlAccordion">
+          <div class="accordion-item bg-dark text-white">
+              <h2 class="accordion-header" id="headingPresets">
+                 <button class="accordion-button collapsed bg-secondary text-white" type="button" data-bs-toggle="collapse" data-bs-target="#presetControls" aria-expanded="false" aria-controls="presetControls">
+                    <i class="fas fa-tags me-2"></i> Clinical Presets
+                 </button>
+              </h2>
+              <div id="presetControls" class="accordion-collapse collapse" aria-labelledby="headingPresets" data-bs-parent="#controlAccordion">
+                 <div class="accordion-body">
+                    <p class="text-white mb-3 small">
+                       Select a preset to load parameters, then click "Update Vitals" to apply.
+                    </p>
+                    <div class="d-grid gap-2 d-md-flex flex-wrap justify-content-center mb-3">
+                       <button id="preset-healthy-button" type="button" class="btn btn-success btn-sm mb-2">Healthy Patient</button>
+                       <button id="preset-stemi-button" type="button" class="btn btn-danger btn-sm mb-2">STEMI</button>
+                       <button id="preset-hypovolemia-button" type="button" class="btn btn-warning btn-sm mb-2">Hypovolemic Shock</button>
+                       <button id="preset-svt-button" type="button" class="btn btn-danger btn-sm mb-2">SVT</button>
+                       <button id="preset-asystole-button" type="button" class="btn btn-secondary btn-sm mb-2">Asystole</button>
+                       <button id="preset-vf-button" type="button" class="btn btn-danger btn-sm mb-2">VF (Coarse)</button>
+                       <button id="preset-pea-button" type="button" class="btn btn-secondary btn-sm mb-2">PEA</button>
+                    </div>
+                    <hr class="border-secondary"/>
+                    <h5 class="text-info mt-3 mb-2">Custom Presets</h5>
+                    <div class="d-grid gap-2 d-md-flex flex-wrap justify-content-center mb-3">
+                        <button id="save-custom-preset-button" type="button" class="btn btn-outline-primary btn-sm mb-2">
+                            <i class="fas fa-save me-1"></i> Save Current as Preset
+                        </button>
+                        <button id="upload-custom-preset-button" type="button" class="btn btn-outline-info btn-sm mb-2">
+                            <i class="fas fa-upload me-1"></i> Upload Preset File(s)
+                        </button>
+                        <input type="file" id="preset-file-input" accept=".json" class="visually-hidden-focusable" multiple/>
+                    </div>
+                    <div id="custom-preset-buttons-container" class="d-grid gap-2 d-md-flex flex-wrap justify-content-center">
+                        <p id="no-custom-presets-label" class="small mb-0">No custom presets loaded.</p>
+                    </div>
+                    </div>
+              </div>
+          </div>
+          <div class="accordion-item bg-dark text-white">
+              <h2 class="accordion-header" id="headingEcg">
+                 <button class="accordion-button bg-secondary text-white" type="button" data-bs-toggle="collapse" data-bs-target="#ecgControls" aria-expanded="true" aria-controls="ecgControls">
+                    ECG Parameters
+                 </button>
+               </h2>
+               <div id="ecgControls" class="accordion-collapse collapse show" aria-labelledby="headingEcg" data-bs-parent="#controlAccordion">
+                  <div class="accordion-body">
+                     <div class="form-check form-switch mb-3">
+                        <input class="form-check-input control-input" type="checkbox" role="switch" id="ecg-visibility-switch" checked/>
+                        <label class="form-check-label text-light" for="ecg-visibility-switch">Show ECG on Monitor</label>
+                     </div>
+                     <hr class="border-secondary" />
+                     <div class="row mb-3">
+                        <div class="col-md-6">
+                           <label for="ecg-rhythm-select" class="form-label">ECG Rhythm</label>
+                           <select id="ecg-rhythm-select" class="form-select control-input">
+                              <optgroup label="Sinus Rhythms & Variations">
+                                <option value="normal" selected>Normal Sinus</option>
+                                <option value="brady">Sinus Bradycardia</option>
+                                <option value="tachy">Sinus Tachycardia</option>
+                                <option value="sinus_arrhythmia">Sinus Arrhythmia</option>
+                                <option value="sinus_t_inversion">Sinus w/ T-Inversion</option>
+                                <option value="sinus_st_depression">Sinus w/ ST Depression</option>
+                                <option value="hyperkalemia_peaked_t">Hyperkalemia (Peaked T)</option>
+                              </optgroup>
+                              <optgroup label="Atrial / SVT / Junctional">
+                                <option value="afib">Atrial Fibrillation</option>
+                                <option value="svt">SVT</option>
+                                <option value="junctional">Junctional Rhythm</option>
+                                <option value="junctional_tachy">Junctional Tachycardia</option>
+                              </optgroup>
+                              <optgroup label="Ventricular Rhythms (Perfusing)">
+                                <option value="idio">Idioventricular Rhythm</option>
+                                <option value="aivr">Accelerated Idioventricular</option>
+                                <option value="vt">Ventricular Tachycardia</option>
+                                <option value="paced_vvi">Ventricular Paced</option>
+                                <option value="agonal">Agonal Rhythm</option>
+                              </optgroup>
+                              <optgroup label="Conduction Blocks">
+                                <option value="avb1">1st Degree AV Block</option>
+                                <option value="avb2m1">2nd Deg AVB Type I (Wenckebach)</option>
+                                <option value="avb2m2">2nd Deg AVB Type II (Mobitz II)</option>
+                                <option value="avb3">3rd Degree AV Block</option>
+                              </optgroup>
+                              <optgroup label="Injury Patterns">
+                                <option value="stemi">STEMI</option>
+                              </optgroup>
+                              <optgroup label="Pulseless Rhythms / Artifacts">
+                                <option value="vf">Ventricular Fibrillation (Coarse)</option>
+                                <option value="fine_vf">Ventricular Fibrillation (Fine)</option>
+                                <option value="vt_pulseless">Pulseless VT</option>
+                                <option value="asystole">Asystole</option>
+                                <option value="pea">Pulseless Electrical Activity (PEA)</option>
+                                <option value="cpr_artifact">CPR Artifact</option>
+                              </optgroup>
+                           </select>
+                        </div>
+                        <div class="col-md-6">
+                           <label for="hr-slider" class="form-label">Heart Rate (bpm)</label>
+                           <div class="input-group slider-control-group">
+                              <button class="btn btn-outline-secondary adjust-btn" type="button" id="hr-minus-btn"><i class="fas fa-minus"></i></button>
+                              <input type="range" id="hr-slider" class="form-range control-input" min="0" max="250" value="75" step="1"/>
+                              <button class="btn btn-outline-secondary adjust-btn" type="button" id="hr-plus-btn"><i class="fas fa-plus"></i></button>
+                              <span id="hr-slider-display" class="badge bg-success p-2 input-group-text" style="min-width: 55px;">75</span>
+                           </div>
+                        </div>
+                     </div>
+                     <hr class="border-secondary" />
+                     <div class="row mb-3">
+                        <div class="col-12 text-center">
+                           <button id="ecg-shock-button" class="btn btn-warning">
+                              <i class="fas fa-bolt me-2"></i>Deliver Shock
+                           </button>
+                           <small class="d-block shock-description mt-1">Simulates defibrillation. Resets rhythm to selected.</small>
+                        </div>
+                     </div>
+                     <hr class="border-secondary" />
+                  </div>
+               </div>
+          </div>
+          <div class="accordion-item bg-dark text-white">
+              <h2 class="accordion-header" id="headingSpo2">
+                 <button class="accordion-button collapsed bg-secondary text-white" type="button" data-bs-toggle="collapse" data-bs-target="#spo2Controls" aria-expanded="false" aria-controls="spo2Controls">
+                    SpO2 Parameters
+                 </button>
+              </h2>
+              <div id="spo2Controls" class="accordion-collapse collapse" aria-labelledby="headingSpo2" data-bs-parent="#controlAccordion">
+                 <div class="accordion-body">
+                    <div class="form-check form-switch mb-3">
+                       <input class="form-check-input control-input" type="checkbox" role="switch" id="spo2-visibility-switch" checked/>
+                       <label class="form-check-label text-light" for="spo2-visibility-switch">Show SpO2 on Monitor</label>
+                    </div>
+                    <hr class="border-secondary" />
+                    <div class="row mb-3">
+                       <div class="col-md-6">
+                          <label for="spo2-slider" class="form-label">SpO2 Value (%)</label>
+                          <div class="input-group slider-control-group">
+                             <button class="btn btn-outline-secondary adjust-btn" type="button" id="spo2-minus-btn"><i class="fas fa-minus"></i></button>
+                             <input type="range" id="spo2-slider" class="form-range control-input" min="0" max="100" value="98" step="1"/>
+                             <button class="btn btn-outline-secondary adjust-btn" type="button" id="spo2-plus-btn"><i class="fas fa-plus"></i></button>
+                             <span id="spo2-slider-display" class="badge bg-info p-2 input-group-text" style="min-width: 55px;">98</span>
+                          </div>
+                       </div>
+                       <div class="col-md-6">
+                          <label class="form-label">Pulse Rate (PR)</label>
+                          <p class="form-control-static text-light ps-1"> Derived from ECG/Pleth </p>
+                       </div>
+                    </div>
+                    <div class="row mb-3">
+                       <div class="col-md-6">
+                          <label for="spo2-shape-select" class="form-label">SpO2 Waveform Shape</label>
+                          <select id="spo2-shape-select" class="form-select control-input">
+                             <option value="normal" selected>Normal Perfusion</option>
+                             <option value="low_perfusion">Low Perfusion</option>
+                             <option value="no_signal">No Signal / Unreliable</option>
+                          </select>
+                       </div>
+                    </div>
+                 </div>
+              </div>
+           </div>
+           <div class="accordion-item bg-dark text-white">
+              <h2 class="accordion-header" id="headingBp">
+                 <button class="accordion-button collapsed bg-secondary text-white" type="button" data-bs-toggle="collapse" data-bs-target="#bpControls" aria-expanded="false" aria-controls="bpControls">
+                    Blood Pressure Parameters
+                 </button>
+              </h2>
+              <div id="bpControls" class="accordion-collapse collapse" aria-labelledby="headingBp" data-bs-parent="#controlAccordion">
+                 <div class="accordion-body">
+                    <div class="form-check form-switch mb-3">
+                       <input class="form-check-input control-input" type="checkbox" role="switch" id="abp-visibility-switch" checked/>
+                       <label class="form-check-label text-light" for="abp-visibility-switch">Show ABP on Monitor</label>
+                    </div>
+                    <hr class="border-secondary" />
+                    <h5 class="text-warning mb-3">Arterial Blood Pressure (ABP) Waveform</h5>
+                    <div class="row mb-3">
+                       <div class="col-md-6">
+                          <label for="abp-sys-slider" class="form-label">Systolic Pressure (mmHg)</label>
+                          <div class="input-group slider-control-group">
+                             <button class="btn btn-outline-secondary adjust-btn" type="button" id="abp-sys-minus-btn"><i class="fas fa-minus"></i></button>
+                             <input type="range" id="abp-sys-slider" class="form-range control-input abp-slider" min="0" max="250" value="120" step="1"/>
+                             <button class="btn btn-outline-secondary adjust-btn" type="button" id="abp-sys-plus-btn"><i class="fas fa-plus"></i></button>
+                             <span id="abp-sys-slider-display" class="badge abp-badge p-2 input-group-text" style="min-width: 55px;">120</span>
+                          </div>
+                       </div>
+                       <div class="col-md-6">
+                          <label for="abp-dia-slider" class="form-label">Diastolic Pressure (mmHg)</label>
+                          <div class="input-group slider-control-group">
+                             <button class="btn btn-outline-secondary adjust-btn" type="button" id="abp-dia-minus-btn"><i class="fas fa-minus"></i></button>
+                             <input type="range" id="abp-dia-slider" class="form-range control-input abp-slider" min="0" max="150" value="80" step="1"/>
+                             <button class="btn btn-outline-secondary adjust-btn" type="button" id="abp-dia-plus-btn"><i class="fas fa-plus"></i></button>
+                             <span id="abp-dia-slider-display" class="badge abp-badge p-2 input-group-text" style="min-width: 55px;">80</span>
+                          </div>
+                       </div>
+                    </div>
+                    <div class="row mb-3">
+                       <div class="col-md-6">
+                          <label class="form-label">Mean Arterial Pressure (MAP)</label>
+                          <p class="form-control-static text-light ps-1">Calculated: <span id="map-display">--</span> mmHg</p>
+                       </div>
+                       <div class="col-md-6">
+                          <label for="abp-shape-select" class="form-label">ABP Waveform Shape</label>
+                          <select id="abp-shape-select" class="form-select control-input">
+                             <option value="normal" selected>Normal</option>
+                             <option value="damped">Damped</option>
+                             <option value="hyperdynamic">Hyperdynamic</option>
+                             <option value="vasoconstricted">Vasoconstricted</option>
+                          </select>
+                       </div>
+                    </div>
+                    <hr class="border-secondary mt-4" />
+                    <div class="form-check form-switch mb-3">
+                       <input class="form-check-input control-input" type="checkbox" role="switch" id="nibp-visibility-switch" checked/>
+                       <label class="form-check-label text-light" for="nibp-visibility-switch">Show NIBP on Monitor</label>
+                    </div>
+                    <hr class="border-secondary" />
+                    <h5 class="text-info mb-3">Non-Invasive Blood Pressure (NIBP)</h5>
+                    <div class="row mb-3">
+                       <div class="col-12 text-center">
+                          <button id="start-nibp-button" class="btn btn-info">
+                             <i class="fas fa-play-circle me-2"></i>Start NIBP Measurement
+                          </button>
+                          <small class="d-block text-muted mt-1">Uses current ABP target values</small>
+                       </div>
+                    </div>
+                 </div>
+              </div>
+           </div>
+           <div class="accordion-item bg-dark text-white">
+              <h2 class="accordion-header" id="headingEtco2">
+                 <button class="accordion-button collapsed bg-secondary text-white" type="button" data-bs-toggle="collapse" data-bs-target="#etco2Controls" aria-expanded="false" aria-controls="etco2Controls">
+                    ETCO2 / Respiration Parameters
+                 </button>
+              </h2>
+              <div id="etco2Controls" class="accordion-collapse collapse" aria-labelledby="headingEtco2" data-bs-parent="#controlAccordion">
+                 <div class="accordion-body">
+                    <div class="form-check form-switch mb-3">
+                       <input class="form-check-input control-input" type="checkbox" role="switch" id="etco2-visibility-switch" checked/>
+                       <label class="form-check-label text-light" for="etco2-visibility-switch">Show ETCO2 on Monitor</label>
+                    </div>
+                    <hr class="border-secondary" />
+                    <div class="row mb-3">
+                       <div class="col-md-6">
+                          <label for="etco2-slider" class="form-label">ETCO2 Value</label>
+                          <div class="input-group slider-control-group">
+                             <button class="btn btn-outline-secondary adjust-btn" type="button" id="etco2-minus-btn"><i class="fas fa-minus"></i></button>
+                             <input type="range" id="etco2-slider" class="form-range control-input etco2-slider" min="0" max="10.7" value="5.3" step="0.1"/>
+                             <button class="btn btn-outline-secondary adjust-btn" type="button" id="etco2-plus-btn"><i class="fas fa-plus"></i></button>
+                             <span id="etco2-slider-display" class="badge etco2-badge p-2 input-group-text" style="min-width: 55px;">5.3</span>
+                             <span id="etco2-slider-unit" class="ms-1 input-group-text bg-dark text-light">kPa</span>
+                          </div>
+                       </div>
+                       <div class="col-md-6">
+                          <label for="rr-slider" class="form-label">Respiratory Rate (RR)</label>
+                          <div class="input-group slider-control-group">
+                             <button class="btn btn-outline-secondary adjust-btn" type="button" id="rr-minus-btn"><i class="fas fa-minus"></i></button>
+                             <input type="range" id="rr-slider" class="form-range control-input etco2-slider" min="0" max="50" value="15" step="1"/>
+                             <button class="btn btn-outline-secondary adjust-btn" type="button" id="rr-plus-btn"><i class="fas fa-plus"></i></button>
+                             <span id="rr-slider-display" class="badge etco2-badge p-2 input-group-text" style="min-width: 55px;">15</span>
+                             <span class="ms-1 input-group-text bg-dark text-light">/min</span>
+                          </div>
+                       </div>
+                    </div>
+                    <div class="row mb-3">
+                       <div class="col-md-6">
+                          <label class="form-label">ETCO2 Unit</label>
+                          <div class="form-check form-switch">
+                             <input class="form-check-input control-input" type="checkbox" role="switch" id="etco2-unit-switch"/>
+                             <label class="form-check-label text-light" for="etco2-unit-switch">Show as mmHg</label>
+                          </div>
+                       </div>
+                       <div class="col-md-6">
+                          <label for="etco2-shape-select" class="form-label">ETCO2 Waveform Shape</label>
+                          <select id="etco2-shape-select" class="form-select control-input">
+                             <option value="normal" selected>Normal</option>
+                             <option value="cpr_low_flow">CPR Assessment / Low Flow</option>
+                             <option value="bronchospasm">Bronchospasm (Shark Fin)</option>
+                             <option value="leak_obstruction">Leak / Obstruction</option>
+                             <option value="disconnect">Disconnect / No Signal</option>
+                          </select>
+                       </div>
+                    </div>
+                 </div>
+              </div>
+           </div>
+           <div class="accordion-item bg-dark text-white">
+             <h2 class="accordion-header" id="headingTemp">
+                <button class="accordion-button collapsed bg-secondary text-white" type="button" data-bs-toggle="collapse" data-bs-target="#tempControls" aria-expanded="false" aria-controls="tempControls">
+                   Temperature Parameters
+                </button>
+             </h2>
+             <div id="tempControls" class="accordion-collapse collapse" aria-labelledby="headingTemp" data-bs-parent="#controlAccordion">
+                <div class="accordion-body">
+                   <div class="form-check form-switch mb-3">
+                      <input class="form-check-input control-input" type="checkbox" role="switch" id="temp-visibility-switch" checked/>
+                      <label class="form-check-label text-light" for="temp-visibility-switch">Show TEMP on Monitor</label>
+                   </div>
+                   <hr class="border-secondary" />
+                   <div class="row mb-3">
+                      <div class="col-md-7">
+                         <label for="temp-slider" class="form-label">Temperature</label>
+                         <div class="input-group slider-control-group">
+                            <button class="btn btn-outline-secondary adjust-btn" type="button" id="temp-minus-btn"><i class="fas fa-minus"></i></button>
+                            <input type="range" id="temp-slider" class="form-range control-input temp-slider" min="34.0" max="42.0" value="37.0" step="0.1"/>
+                            <button class="btn btn-outline-secondary adjust-btn" type="button" id="temp-plus-btn"><i class="fas fa-plus"></i></button>
+                            <span id="temp-slider-display" class="badge temp-badge p-2 input-group-text" style="min-width: 55px;">37.0</span>
+                            <span id="temp-slider-unit" class="ms-1 input-group-text bg-dark text-light">°C</span>
+                         </div>
+                      </div>
+                      <div class="col-md-5">
+                         <label class="form-label">Display Unit</label>
+                         <div class="form-check form-switch">
+                            <input class="form-check-input control-input" type="checkbox" role="switch" id="temp-unit-switch"/>
+                            <label class="form-check-label text-light" for="temp-unit-switch">Show as °F</label>
+                         </div>
+                      </div>
+                   </div>
+                </div>
+             </div>
+          </div>
+          <div class="accordion-item bg-dark text-white">
+            <h2 class="accordion-header" id="headingColors">
+               <button class="accordion-button collapsed bg-secondary text-white" type="button" data-bs-toggle="collapse" data-bs-target="#colorControls" aria-expanded="false" aria-controls="colorControls">
+                  <i class="fas fa-palette me-2"></i> Color Settings
+               </button>
+            </h2>
+            <div id="colorControls" class="accordion-collapse collapse" aria-labelledby="headingColors" data-bs-parent="#controlAccordion">
+               <div class="accordion-body">
+                  <p class="text-white mb-3 small">
+                     Adjust the colors for waveforms and numeric values. Changes require clicking "Update Vitals".
+                  </p>
+                  <div class="row g-3">
+                     <div class="col-md-4 col-sm-6">
+                        <label for="ecg-color-picker" class="form-label">ECG Color</label>
+                        <input type="color" class="form-control form-control-color control-input" id="ecg-color-picker" value="#00ff00" title="Choose ECG color">
+                     </div>
+                     <div class="col-md-4 col-sm-6">
+                        <label for="spo2-color-picker" class="form-label">SpO2 Color</label>
+                        <input type="color" class="form-control form-control-color control-input" id="spo2-color-picker" value="#00ffff" title="Choose SpO2 color">
+                     </div>
+                     <div class="col-md-4 col-sm-6">
+                        <label for="abp-color-picker" class="form-label">ABP Color</label>
+                        <input type="color" class="form-control form-control-color control-input" id="abp-color-picker" value="#ff0000" title="Choose ABP color">
+                     </div>
+                     <div class="col-md-4 col-sm-6">
+                        <label for="etco2-color-picker" class="form-label">ETCO2 Color</label>
+                        <input type="color" class="form-control form-control-color control-input" id="etco2-color-picker" value="#ffff00" title="Choose ETCO2 color">
+                     </div>
+                     <div class="col-md-4 col-sm-6">
+                        <label for="nibp-color-picker" class="form-label">NIBP Color</label>
+                        <input type="color" class="form-control form-control-color control-input" id="nibp-color-picker" value="#ff0000" title="Choose NIBP color">
+                     </div>
+                     <div class="col-md-4 col-sm-6">
+                        <label for="temp-color-picker" class="form-label">TEMP Color</label>
+                        <input type="color" class="form-control form-control-color control-input" id="temp-color-picker" value="#ffc107" title="Choose TEMP color">
+                     </div>
+                  </div>
+               </div>
+            </div>
+         </div>
+         </div> <hr class="border-secondary mt-4 mb-3"/>
+
+         <div id="session-controls" class="mt-3">
+            <h4 class="text-center mb-3 text-info">Multi-Device Session</h4>
+            <div class="row justify-content-center align-items-center mb-3">
+                <div class="col-md-4 mb-2 mb-md-0">
+                    <label for="session-id-input" class="form-label small">Session ID:</label>
+                    <input type="text" class="form-control form-control-sm" id="session-id-input" placeholder="Enter ID to join or create new" aria-label="Session ID">
+                </div>
+                <div class="col-md-4 mb-2 mb-md-0 text-center">
+                     <button class="btn btn-sm btn-success me-2" id="create-session-btn">Create Session</button>
+                     <button class="btn btn-sm btn-primary" id="join-session-btn">Join Session</button>
+                </div>
+                 <div class="col-md-4 text-center text-md-start">
+                     <span id="connection-status-label" class="badge bg-secondary">Disconnected</span>
+                 </div>
+            </div>
+            <div class="row justify-content-center align-items-center mb-3" id="session-share-area" style="display: none;">
+                <div class="col-md-8 mb-2 mb-md-0">
+                    <label for="session-link-input" class="form-label small">Session Link:</label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control form-control-sm" id="session-link-input" readonly aria-label="Session Link">
+                        <button class="btn btn-sm btn-outline-secondary" type="button" id="copy-link-btn" title="Copy link">
+                            <i class="fas fa-copy"></i> Copy
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-4 text-center">
+                    <label class="form-label small d-block mb-1">Scan QR Code to Join:</label>
+                    <div id="qr-code-container" style="background-color: white; padding: 5px; border-radius: 4px; display: inline-block; line-height: 0;">
+                        </div>
+                </div>
+            </div>
+            <div class="row justify-content-center mb-2 align-items-center">
+                <div class="col-auto">
+                     <label class="form-label small me-3 mb-0">Select Role:</label>
+                </div>
+                <div class="col-auto">
+                    <div class="form-check form-check-inline">
+                      <input class="form-check-input" type="radio" name="deviceRole" id="role-selector-controller" value="controller" checked>
+                      <label class="form-check-label small" for="role-selector-controller">Controller</label>
+                    </div>
+                </div>
+                 <div class="col-auto">
+                    <div class="form-check form-check-inline">
+                      <input class="form-check-input" type="radio" name="deviceRole" id="role-selector-monitor" value="monitor">
+                      <label class="form-check-label small" for="role-selector-monitor">Monitor</label>
+                    </div>
+                 </div>
+                 <div class="col-auto ms-md-auto mt-2 mt-md-0">
+                     <button id="fullscreen-button" class="btn btn-sm btn-outline-light">
+                         <i class="fas fa-expand me-1"></i> Full screen
+                     </button>
+                 </div>
+            </div>
+        </div> </div> <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+       <script src="https://cdn.jsdelivr.net/chartist.js/latest/chartist.min.js"></script>
+       <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+       <script type="module" src="networkManager.js"></script>
+       <script type="module" src="script.js"></script>
+    </div> </body>
+</html>
