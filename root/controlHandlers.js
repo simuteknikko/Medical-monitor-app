@@ -796,3 +796,16 @@ export function showPendingChanges(monitorInstance) {
     alertElement.classList.toggle("d-none", !hasPendingChanges);
     updateButton.disabled = !hasPendingChanges || monitorInstance.updateTimeoutId !== null;
 }
+
+// NEW: Exported function to trigger fullscreen programmatically
+export function triggerFullscreen() {
+    const elem = document.getElementById("monitor-wrapper-fullscreen-target");
+    if (!elem) return;
+
+    if (!document.fullscreenElement) {
+        elem.requestFullscreen().catch((err) => {
+            console.error(`Error attempting to enable fullscreen: ${err.message} (${err.name})`);
+        });
+        document.body.classList.add("fullscreen-active");
+    }
+}

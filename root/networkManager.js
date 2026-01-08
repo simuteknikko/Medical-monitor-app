@@ -31,6 +31,8 @@ let reconnectTimerId = null;
 let reconnectDelay = RECONNECT_INITIAL_DELAY;
 let sessionIdFromUrl = null;
 let isAttemptingAutoJoin = false;
+let onSessionCreatedCallback = null;
+let onSessionJoinedCallback = null;
 
 // --- DOM Elements ---
 let sessionIdInput, createSessionBtn, joinSessionBtn, connectionStatusLabel;
@@ -55,6 +57,8 @@ export function initializeNetwork(callbacks, mInterface) {
     onShockReceivedCallback = callbacks.onShock;
     onNibpTriggerReceivedCallback = callbacks.onNibpTrigger;
     onSoundStateReceivedCallback = callbacks.onSoundState;
+    onSessionCreatedCallback = callbacks.onSessionCreated;
+    onSessionJoinedCallback = callbacks.onSessionJoined;
     monitorInterface = mInterface;
 
     sessionIdInput = document.getElementById('session-id-input');
@@ -237,6 +241,9 @@ function handleServerMessage(message) {
             currentSessionId = message.sessionId;
             if(sessionIdInput) sessionIdInput.value = currentSessionId;
             console.log(`[Network] Session created with ID: ${currentSessionId}`);
+            if (typeof onSessionCreatedCallback === 'function') {
+                onSessionCreatedCallback(currentSessionId);
+            }
             alert(`Session created! Share this ID or link with monitor devices: ${currentSessionId}`);
             sendSetRole(currentRole);
             updateConnectionStatus(`Session: ${currentSessionId}`, 'bg-success');
@@ -244,6 +251,9 @@ function handleServerMessage(message) {
         case 'session_joined':
             currentSessionId = message.sessionId;
             console.log(`[Network] Successfully joined session: ${currentSessionId}`);
+            if (typeof onSessionJoinedCallback === 'function') {
+                onSessionJoinedCallback(currentSessionId);
+            }
             if (!isAttemptingAutoJoin && !reconnectTimerId) {
                  alert(`Joined session: ${currentSessionId}`);
             }
