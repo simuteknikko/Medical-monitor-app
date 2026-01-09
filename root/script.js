@@ -1877,6 +1877,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     updateVitalsDisplay() {
+      // MODIFICATION: Guard clause. If animation is not running, do not show values.
+      if (!this.animationRunning) {
+        // Ensure the screen stays blank/dashed
+        resetVitalsDisplay(this.targetParams); 
+        return;
+      }
       updateVitalsDisplay(this.currentParams);
     }
     updateSliderDisplays() {
