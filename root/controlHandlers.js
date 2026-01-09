@@ -245,17 +245,89 @@ function _handleAdjustButton(paramType, direction, monitorInstance) {
 function _handleUpdateVitalsClick(monitorInstance) {
     const updateDelaySelect = document.getElementById("update-delay-select");
     const delayMs = updateDelaySelect ? parseInt(updateDelaySelect.value, 10) : 0;
-    if (monitorInstance.updateTimeoutId !== null) { clearTimeout(monitorInstance.updateTimeoutId); monitorInstance.updateTimeoutId = null; console.log("[_handleUpdateVitalsClick] Previous update timeout cancelled."); }
-    if (monitorInstance.pendingChangesAlert) monitorInstance.pendingChangesAlert.classList.add("d-none"); if (monitorInstance.updateVitalsButton) monitorInstance.updateVitalsButton.disabled = true;
-    const role = getCurrentRole(); console.log(`[_handleUpdateVitalsClick] Role: ${role}, Delay: ${delayMs}ms`);
-    if (!monitorInstance.animationRunning) { console.log("[_handleUpdateVitalsClick] Simulation not active, changes will be applied on activation."); if (delayMs === 0 && role === 'controller') { const paramsToSend = { ...monitorInstance.targetParams }; delete paramsToSend.params; sendParamUpdate(paramsToSend); console.log("[_handleUpdateVitalsClick] Sent params update via network (simulation inactive)."); } return; }
-    const applyFn = () => { console.log(`[Timeout/Immediate] Applying parameter update (delay was ${delayMs}ms). Role: ${role}`); monitorInstance.updateTimeoutId = null;
-        if (role === 'controller') { const paramsToSend = { ...monitorInstance.targetParams }; delete paramsToSend.params; sendParamUpdate(paramsToSend); console.log("[applyFn] Sent params update via network."); }
-        if (typeof monitorInstance.initiateParameterChange === 'function') { console.log("[applyFn] Initiating local parameter change application (Controller or Standalone)."); monitorInstance.initiateParameterChange(); }
-        else { console.error("[applyFn] initiateParameterChange function not found on monitorInstance!"); }
+
+    // Clear any existing timeout to avoid double-firing
+    if (monitorInstance.updateTimeoutId !== null) { 
+        clearTimeout(monitorInstance.updateTimeoutId); 
+        monitorInstance.updateTimeoutId = null; 
+        console.log("[_handleUpdateVitalsClick] Previous update timeout cancelled."); 
+    }
+
+    // Immediately hide alert and disable button for visual feedback
+    if (monitorInstance.pendingChangesAlert) monitorInstance.pendingChangesAlert.classList.add("d-none"); 
+    if (monitorInstance.updateVitalsButton) monitorInstance.updateVitalsButton.disabled = true;
+
+    const role = getCurrentRole(); 
+    console.log(`[_handleUpdateVitalsClick] Role: ${role}, Delay: ${delayMs}ms`);
+
+    // --- MODIFIED BLOCK START: HANDLE SETUP MODE (NOT RUNNING) ---
+    if (!monitorInstance.animationRunning) {
+        console.log("[_handleUpdateVitalsClick] Simulation inactive. Applying changes immediately (setup mode).");
+
+        // 1. Force local update: Snap current params to target immediately
+        monitorInstance.currentParams = JSON.parse(JSON.stringify(monitorInstance.targetParams));
+        monitorInstance.interpolationTargetParams = JSON.parse(JSON.stringify(monitorInstance.targetParams));
+        
+        // 2. Clear all pending update flags (we are forcing the state)
+        monitorInstance.isEtco2UpdatePending = false;
+        monitorInstance.pendingEtco2Params = null;
+        monitorInstance.isSpo2UpdatePending = false;
+        monitorInstance.pendingSpo2Params = null;
+        monitorInstance.isAbpUpdatePending = false;
+        monitorInstance.pendingAbpParams = null;
+
+        // 3. Update the Numeric Display immediately (since the animation loop isn't running to do it)
+        if (typeof monitorInstance.updateVitalsDisplay === 'function') {
+            monitorInstance.updateVitalsDisplay();
+        }
+
+        // 4. Send Network Update (Controller Only)
+        // We ignore the delay here to ensure lobby/setup is synced instantly
+        if (role === 'controller') {
+            const paramsToSend = { ...monitorInstance.targetParams };
+            delete paramsToSend.params; // Remove large internal object
+            sendParamUpdate(paramsToSend);
+            console.log("[_handleUpdateVitalsClick] Sent params update via network (simulation inactive).");
+        }
+
+        // 5. Re-check UI state (alert should stay hidden)
+        if (typeof monitorInstance.showPendingChanges === 'function') {
+            monitorInstance.showPendingChanges();
+        }
+
+        return; // Exit early, do not schedule the animation-based update
+    }
+    // --- MODIFIED BLOCK END ---
+
+    // Standard logic for running simulation (Animation Loop Active)
+    const applyFn = () => { 
+        console.log(`[Timeout/Immediate] Applying parameter update (delay was ${delayMs}ms). Role: ${role}`); 
+        monitorInstance.updateTimeoutId = null;
+        
+        if (role === 'controller') { 
+            const paramsToSend = { ...monitorInstance.targetParams }; 
+            delete paramsToSend.params; 
+            sendParamUpdate(paramsToSend); 
+            console.log("[applyFn] Sent params update via network."); 
+        }
+        
+        if (typeof monitorInstance.initiateParameterChange === 'function') { 
+            console.log("[applyFn] Initiating local parameter change application (Controller or Standalone)."); 
+            monitorInstance.initiateParameterChange(); 
+        } else { 
+            console.error("[applyFn] initiateParameterChange function not found on monitorInstance!"); 
+        }
+        
         if (monitorInstance.updateVitalsButton) monitorInstance.updateVitalsButton.disabled = true;
     };
-    if (delayMs === 0) { applyFn(); } else { console.log(`[_handleUpdateVitalsClick] Scheduling parameter update transmission and local initiation after ${delayMs}ms.`); monitorInstance.updateTimeoutId = setTimeout(applyFn, delayMs); if (monitorInstance.updateVitalsButton) monitorInstance.updateVitalsButton.disabled = true; }
+
+    if (delayMs === 0) { 
+        applyFn(); 
+    } else { 
+        console.log(`[_handleUpdateVitalsClick] Scheduling parameter update transmission and local initiation after ${delayMs}ms.`); 
+        monitorInstance.updateTimeoutId = setTimeout(applyFn, delayMs); 
+        if (monitorInstance.updateVitalsButton) monitorInstance.updateVitalsButton.disabled = true; 
+    }
 }
 
 function _handleColorChange(colorKey, event, monitorInstance) {
@@ -749,12 +821,7 @@ export function showPendingChanges(monitorInstance) {
         updateButton.disabled = true;
         return;
     }
-    if (!monitorInstance.animationRunning) {
-         alertElement.classList.add("d-none");
-         updateButton.disabled = true;
-         return;
-    }
-
+    
     let hasPendingChanges = false;
     const target = monitorInstance.targetParams;
     const compareTo = monitorInstance.interpolationTargetParams;
