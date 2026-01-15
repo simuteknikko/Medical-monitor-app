@@ -105,6 +105,7 @@ import {
   bindControlEvents,
   updateControlsToReflectParams,
   showPendingChanges,
+  triggerFullscreen
 } from "./controlHandlers.js";
 import { initializeCharts, updateCharts, clearCharts } from "./chartManager.js";
 import {
@@ -225,20 +226,44 @@ document.addEventListener("DOMContentLoaded", () => {
           this.updateSliderDisplays();
           updateMonitorColors(this.currentParams.colors, this.charts);
 
+          // --- REPLACEMENT BLOCK START ---
           initializeNetwork(
-            { // Callbacks
+            { 
               onParamUpdate: this.handleRemoteParamUpdate.bind(this),
               onActivate: this.startAnimation.bind(this),
               onDeactivate: this.stopAnimation.bind(this),
               onShock: this._executeShock.bind(this),
               onNibpTrigger: this.handleRemoteNibpTrigger.bind(this),
               onSoundState: setSoundState,
+              
+              // NEW CALLBACKS
+              onSessionCreated: (sessionId) => {
+                  document.getElementById('landing-menu').classList.add('d-none');
+                  document.getElementById('landing-lobby').classList.remove('d-none');
+                  document.getElementById('landing-session-id-display').textContent = sessionId;
+                  const qrContainer = document.getElementById('landing-qr-container');
+                  qrContainer.innerHTML = '';
+                  // Use existing QRCode library
+                  new QRCode(qrContainer, {
+                      text: `${window.location.origin}/?session=${sessionId}`,
+                      width: 128, height: 128
+                  });
+              },
+              onSessionJoined: (sessionId) => {
+                  document.getElementById('landing-menu').classList.add('d-none');
+                  document.getElementById('landing-join').classList.add('d-none');
+                  document.getElementById('landing-lobby').classList.remove('d-none');
+                  document.getElementById('landing-session-id-display').textContent = sessionId;
+              }
             },
-            { // Monitor Interface
+            { 
               isMonitorActive: this.isMonitorActive.bind(this),
               deactivateMonitor: this.stopAnimation.bind(this)
             }
           );
+
+          // Initialize the Landing Page Logic immediately after network init
+          this._initLandingPage();
 
           console.log("[Constructor] Initialization finished successfully.");
         } else {
@@ -268,6 +293,60 @@ document.addEventListener("DOMContentLoaded", () => {
       };
     }
 
+    // --- INSERT NEW METHOD ---
+    _initLandingPage() {
+        const landingView = document.getElementById('landing-view');
+        const appView = document.getElementById('app-view');
+
+        const enterApp = (role) => {
+            landingView.style.display = 'none';
+            appView.style.display = 'block';
+            
+            if (role === 'monitor') {
+                document.getElementById('role-selector-monitor').click();
+                // Call the exported helper to simulate the button press
+                setTimeout(() => triggerFullscreen(), 100); 
+            } else {
+                document.getElementById('role-selector-controller').click();
+            }
+        };
+
+        // Button Listeners
+        const btnStandalone = document.getElementById('btn-mode-standalone');
+        if (btnStandalone) btnStandalone.onclick = () => enterApp('controller');
+
+        const btnMulti = document.getElementById('btn-mode-multidevice');
+        if (btnMulti) btnMulti.onclick = () => document.getElementById('create-session-btn').click();
+
+        const btnJoin = document.getElementById('btn-mode-join');
+        if (btnJoin) btnJoin.onclick = () => {
+            document.getElementById('landing-menu').classList.add('d-none');
+            document.getElementById('landing-join').classList.remove('d-none');
+        };
+
+        const btnJoinAction = document.getElementById('btn-landing-join-action');
+        if (btnJoinAction) btnJoinAction.onclick = () => {
+            const id = document.getElementById('landing-join-id').value;
+            if (id) {
+                document.getElementById('session-id-input').value = id;
+                document.getElementById('join-session-btn').click();
+            }
+        };
+
+        const btnJoinBack = document.getElementById('btn-join-back');
+        if (btnJoinBack) btnJoinBack.onclick = () => {
+            document.getElementById('landing-join').classList.add('d-none');
+            document.getElementById('landing-menu').classList.remove('d-none');
+        };
+
+        const btnRoleCtrl = document.getElementById('btn-role-controller');
+        if (btnRoleCtrl) btnRoleCtrl.onclick = () => enterApp('controller');
+
+        const btnRoleMon = document.getElementById('btn-role-monitor');
+        if (btnRoleMon) btnRoleMon.onclick = () => enterApp('monitor');
+    }
+    // --- END NEW METHOD ---
+    
     _initializeTargetParams() {
       const rhythmSelect = document.getElementById("ecg-rhythm-select");
       const hrSlider = document.getElementById("hr-slider");
@@ -1798,6 +1877,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     updateVitalsDisplay() {
+      // MODIFICATION: Guard clause. If animation is not running, do not show values.
+      if (!this.animationRunning) {
+        // Ensure the screen stays blank/dashed
+        resetVitalsDisplay(this.targetParams); 
+        return;
+      }
       updateVitalsDisplay(this.currentParams);
     }
     updateSliderDisplays() {

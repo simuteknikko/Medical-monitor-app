@@ -19,7 +19,55 @@
     <link href="style.css" rel="stylesheet" />
   </head>
   <body>
-    <div class="page-wrapper">
+   <div id="landing-view">
+        <div class="container d-flex flex-column justify-content-center align-items-center h-100">
+            <div class="text-center" style="max-width: 500px; width: 100%;">
+                <h1 class="display-5 text-info mb-4">Medical Monitor Sim</h1>
+
+                <div id="landing-menu">
+                    <button id="btn-mode-standalone" class="btn btn-outline-light btn-lg w-100 mb-3 py-3">
+                        <i class="fas fa-desktop me-2"></i> Standalone Monitor
+                    </button>
+                    <button id="btn-mode-multidevice" class="btn btn-primary btn-lg w-100 mb-3 py-3">
+                        <i class="fas fa-network-wired me-2"></i> Multi-Device Mode
+                    </button>
+                    <button id="btn-mode-join" class="btn btn-secondary btn-lg w-100 py-3">
+                        Join Existing Session
+                    </button>
+                </div>
+
+                <div id="landing-join" class="d-none">
+                    <h3 class="text-light mb-3">Join Session</h3>
+                    <input type="text" id="landing-join-id" class="form-control form-control-lg text-center mb-3 text-uppercase" placeholder="Enter Session ID">
+                    <button id="btn-landing-join-action" class="btn btn-success w-100 py-3 mb-2">Join</button>
+                    <button id="btn-join-back" class="btn btn-link text-muted">Back</button>
+                </div>
+
+                <div id="landing-lobby" class="d-none">
+                    <h3 class="text-light mb-2">Session Ready</h3>
+                    <div class="bg-white p-2 rounded d-inline-block mb-3">
+                        <div id="landing-qr-container"></div>
+                    </div>
+                    <h2 class="text-warning mb-4" id="landing-session-id-display">--</h2>
+                    
+                    <p class="text-white-50 mb-3">Select this device's role:</p>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <button id="btn-role-controller" class="btn btn-outline-info w-100 py-4">
+                                <i class="fas fa-gamepad fa-2x d-block mb-2"></i> Controller
+                            </button>
+                        </div>
+                        <div class="col-6">
+                            <button id="btn-role-monitor" class="btn btn-outline-success w-100 py-4">
+                                <i class="fas fa-tv fa-2x d-block mb-2"></i> Monitor
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="page-wrapper" id="app-view" style="display: none;">
       <h1 class="text-center my-3">Medical Monitor Simulator</h1>
 
       <div class="monitor-wrapper" id="monitor-wrapper-fullscreen-target">
