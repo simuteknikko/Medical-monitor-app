@@ -27,6 +27,8 @@ import {
     fahrenheitToCelsius
 } from "./config.js";
 import { ensureFinite } from "./waveformUtils.js";
+
+import { updateMonitorColors } from "./uiUpdater.js";
 // Import network functions
 import {
     sendParamUpdate,
@@ -280,6 +282,9 @@ function _handleUpdateVitalsClick(monitorInstance) {
         if (typeof monitorInstance.updateVitalsDisplay === 'function') {
             monitorInstance.updateVitalsDisplay();
         }
+
+        // 3b. Update Colors Immediately
+        updateMonitorColors(monitorInstance.currentParams.colors, monitorInstance.charts);
 
         // 4. Send Network Update (Controller Only)
         // We ignore the delay here to ensure lobby/setup is synced instantly
