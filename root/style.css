@@ -623,4 +623,29 @@ body.fullscreen-active #temp-container-wrapper {
 }
 .h-100 { height: 100% !important; }
 #landing-qr-container img { margin: 0 auto; display: block; }
+
 /* --- END OF NEW STYLES --- */
+
+/* --- Controller Bar Color Indicators --- */
+/* Adds a colored section (left border) to parameter control bars */
+/* utilizing the existing dynamic CSS variables. */
+
+#headingEcg .accordion-button {
+  border-left: 12px solid var(--ecg-color, #00ff00);
+}
+
+#headingSpo2 .accordion-button {
+  border-left: 12px solid var(--spo2-color, #00ffff);
+}
+
+#headingBp .accordion-button {
+  border-left: 12px solid var(--abp-color, #ff0000);
+}
+
+#headingEtco2 .accordion-button {
+  border-left: 12px solid var(--etco2-color, #ffff00);
+}
+
+#headingTemp .accordion-button {
+  border-left: 12px solid var(--temp-color, #ffc107);
+}
