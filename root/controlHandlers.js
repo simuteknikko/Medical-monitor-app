@@ -677,6 +677,46 @@ export function bindControlEvents(monitorInstance) {
     _addListener("etco2-color-picker", "input", (e) => _handleColorChange('etco2Color', e, monitorInstance));
     _addListener("nibp-color-picker", "input", (e) => _handleColorChange('nibpColor', e, monitorInstance));
     _addListener("temp-color-picker", "input", (e) => _handleColorChange('tempColor', e, monitorInstance));
+    // --- Alarm Limit Bindings ---
+    const alarmBindings = [
+        { id: 'alarm-ecg-low', cat: 'ecg', key: 'low' },
+        { id: 'alarm-ecg-high', cat: 'ecg', key: 'high' },
+        { id: 'alarm-spo2-low', cat: 'spo2', key: 'low' },
+        { id: 'alarm-abp-low', cat: 'abp', key: 'low_map' },
+        { id: 'alarm-etco2-low', cat: 'etco2', key: 'low' },
+        { id: 'alarm-etco2-high', cat: 'etco2', key: 'high' }
+    ];
+
+    alarmBindings.forEach(binding => {
+        const inputEl = document.getElementById(binding.id);
+        const sliderEl = document.getElementById(binding.id + '-slider');
+
+        // Helper to update global state and trigger yellow button
+        const updateState = (val) => {
+            if (!isNaN(val) && monitorInstance.targetParams && monitorInstance.targetParams.alarms) {
+                monitorInstance.targetParams.alarms[binding.cat][binding.key] = val;
+                monitorInstance.showPendingChanges(); 
+            }
+        };
+
+        // If user types in the box: update slider and state
+        if (inputEl) {
+            inputEl.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                if (sliderEl) sliderEl.value = val; // Sync slider to box
+                updateState(val);
+            });
+        }
+
+        // If user moves the slider: update box and state
+        if (sliderEl) {
+            sliderEl.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                if (inputEl) inputEl.value = val; // Sync box to slider
+                updateState(val);
+            });
+        }
+    });
 
     _loadCustomPresetsFromStorage(monitorInstance);
 
@@ -813,6 +853,25 @@ function _updateColorControlsUI(params) {
     const colors = params.colors; if (!colors) return;
     const ecgPicker = document.getElementById("ecg-color-picker"); const spo2Picker = document.getElementById("spo2-color-picker"); const abpPicker = document.getElementById("abp-color-picker"); const etco2Picker = document.getElementById("etco2-color-picker"); const nibpPicker = document.getElementById("nibp-color-picker"); const tempPicker = document.getElementById("temp-color-picker");
     if (ecgPicker && colors.ecgColor) ecgPicker.value = colors.ecgColor; if (spo2Picker && colors.spo2Color) spo2Picker.value = colors.spo2Color; if (abpPicker && colors.abpColor) abpPicker.value = colors.abpColor; if (etco2Picker && colors.etco2Color) etco2Picker.value = colors.etco2Color; if (nibpPicker && colors.nibpColor) nibpPicker.value = colors.nibpColor; if (tempPicker && colors.tempColor) tempPicker.value = colors.tempColor;
+
+// Update Alarm Inputs & Sliders from current state
+    if (p.alarms) {
+        const syncAlarmControls = (baseId, val) => {
+            const inputEl = document.getElementById(baseId);
+            const sliderEl = document.getElementById(baseId + '-slider');
+            
+            // Set values if elements exist
+            if (inputEl) inputEl.value = val;
+            if (sliderEl) sliderEl.value = val;
+        };
+
+        syncAlarmControls('alarm-ecg-low', p.alarms.ecg.low);
+        syncAlarmControls('alarm-ecg-high', p.alarms.ecg.high);
+        syncAlarmControls('alarm-spo2-low', p.alarms.spo2.low);
+        syncAlarmControls('alarm-abp-low', p.alarms.abp.low_map);
+        syncAlarmControls('alarm-etco2-low', p.alarms.etco2.low);
+        syncAlarmControls('alarm-etco2-high', p.alarms.etco2.high);
+    }
 }
 
 export function showPendingChanges(monitorInstance) {
@@ -838,7 +897,7 @@ export function showPendingChanges(monitorInstance) {
         console.log("[showPendingChanges] No interpolationTargetParams, assuming pending changes if targetParams exist.");
     } else {
         try {
-            const keysToCompare = ['ecg', 'spo2', 'abp', 'etco2', 'temp', 'nibp', 'colors'];
+            const keysToCompare = ['ecg', 'spo2', 'abp', 'etco2', 'temp', 'nibp', 'colors', 'alarms'];
             for (const key of keysToCompare) {
                 if (!target[key] || !compareTo[key]) {
                     if (target[key] !== compareTo[key]) {

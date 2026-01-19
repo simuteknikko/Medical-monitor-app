@@ -96,46 +96,64 @@ function resetActiveAlarms() {
 
 export function checkAlarms(currentParams) {
     if (!currentParams) return {};
-    const nowActive = {};
-    const thresholds = ALARM_THRESHOLDS;
 
-    if (currentParams.ecg?.visible && currentParams.ecg.params &&
-        !currentParams.ecg.params.isFlat && !currentParams.ecg.params.isChaotic &&
-        !currentParams.ecg.params.isPEA && !currentParams.ecg.params.isArtifact) {
-        const hr = ensureFinite(currentParams.ecg.hr, null);
+    // Use dynamic alarms from state, or fallback to defaults
+    const thresholds = currentParams.alarms || {
+        ecg: { low: 50, high: 120 },
+        spo2: { low: 90 },
+        abp: { low_map: 65 },
+        etco2: { low: 3.0, high: 6.0 }
+    };
+
+    const nowActive = {};
+
+    // 1. CHECK ECG (Heart Rate) - IGNORE if Flatline, VF, PEA, or Artifact
+    if (currentParams.ecg?.visible && 
+        currentParams.ecg.params &&
+        !currentParams.ecg.params.isFlat && 
+        !currentParams.ecg.params.isChaotic && 
+        !currentParams.ecg.params.isPEA && 
+        !currentParams.ecg.params.isArtifact) {
+        
+        const hr = currentParams.ecg.hr;
         if (hr !== null) {
-            if (hr < thresholds.ecg.low_hr) nowActive['low_hr'] = true;
-            if (hr > thresholds.ecg.high_hr) nowActive['high_hr'] = true;
+            if (hr < thresholds.ecg.low) nowActive['low_hr'] = true;
+            if (hr > thresholds.ecg.high) nowActive['high_hr'] = true;
         }
     }
 
+    // 2. CHECK SPO2
     if (currentParams.spo2?.visible) {
-        const spo2 = ensureFinite(currentParams.spo2.value, null);
-         if (spo2 !== null && spo2 > 0 && currentParams.spo2.shape !== 'no_signal') {
-             if (spo2 < thresholds.spo2.low) nowActive['low_spo2'] = true;
-         }
+        const spo2 = currentParams.spo2.value;
+        if (spo2 !== null && spo2 > 0 && currentParams.spo2.shape !== 'no_signal') {
+            if (spo2 < thresholds.spo2.low) nowActive['low_spo2'] = true;
+        }
     }
 
+    // 3. CHECK ABP (MAP)
     if (currentParams.abp?.visible && !(currentParams.ecg?.params?.isArtifact && currentParams.ecg?.params?.artifactType === 'cpr')) {
-         const sys = ensureFinite(currentParams.abp.sys, null);
-         const dia = ensureFinite(currentParams.abp.dia, null);
-         if (sys !== null && dia !== null && sys > 0 && dia >= 0 && sys > dia) {
+        const sys = currentParams.abp.sys;
+        const dia = currentParams.abp.dia;
+        if (sys !== null && dia !== null && sys > 0 && dia >= 0 && sys > dia) {
             const map = Math.round(dia + (sys - dia) / 3);
             if (map < thresholds.abp.low_map) {
                 nowActive['low_map'] = true;
             }
-         }
-    }
-
-    if (currentParams.etco2?.visible) {
-        const valueKpa = ensureFinite(currentParams.etco2.valueKpa, null);
-        if (valueKpa !== null && valueKpa > 0 &&
-            currentParams.etco2.etco2Shape !== 'disconnect' &&
-            currentParams.etco2.etco2Shape !== 'cpr_low_flow') {
-            if (valueKpa < thresholds.etco2.low_kpa) nowActive['low_etco2'] = true;
-            if (valueKpa > thresholds.etco2.high_kpa) nowActive['high_etco2'] = true;
         }
     }
+
+    // 4. CHECK ETCO2
+    if (currentParams.etco2?.visible) {
+        const valueKpa = currentParams.etco2.valueKpa;
+        if (valueKpa !== null && valueKpa > 0 && 
+            currentParams.etco2.etco2Shape !== 'disconnect' && 
+            currentParams.etco2.etco2Shape !== 'cpr_low_flow') {
+            
+            if (valueKpa < thresholds.etco2.low) nowActive['low_etco2'] = true;
+            if (valueKpa > thresholds.etco2.high) nowActive['high_etco2'] = true;
+        }
+    }
+
     activeAlarms = nowActive;
     return activeAlarms;
 }

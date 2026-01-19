@@ -38,3 +38,10 @@ export const DEFAULT_TEMP_UNIT = 'C';
 // --- Temperature Conversion Helpers ---
 export const celsiusToFahrenheit = (c) => (c * 9/5) + 32;
 export const fahrenheitToCelsius = (f) => (f - 32) * 5/9;
+
+export const DEFAULT_ALARM_THRESHOLDS = {
+    ecg: { low: 50, high: 120 },   // Low/High Heart Rate
+    spo2: { low: 90 },             // Low SpO2
+    abp: { low_map: 65 },          // Low Mean Arterial Pressure
+    etco2: { low: 3.0, high: 6.0 } // Low/High ETCO2 (kPa)
+};

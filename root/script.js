@@ -63,8 +63,9 @@
 //          + BUGFIX (Visibility Toggle): Ensured visibility changes are robustly applied to currentParams
 //                                     and interpolationTargetParams in initiateParameterChange.
 
-// --- Module Imports ---
+// --- Module Imports --- 
 import {
+  DEFAULT_ALARM_THRESHOLDS,
   BUFFER_SECONDS,
   SAMPLE_RATE,
   BUFFER_SIZE,
@@ -82,7 +83,8 @@ import {
   INTERPOLATION_SNAP_THRESHOLD,
   NUMERIC_DISPLAY_UPDATE_INTERVAL_MS,
   KPA_TO_MMHG,
-  CPR_ETCO2_VALUE_KPA, // Varmistetaan, että tämä on tuotu
+  CPR_ETCO2_VALUE_KPA,
+  GAP_SAMPLES
 } from "./config.js";
 import { RHYTHM_PARAMS } from "./rhythms.js";
 import {
@@ -122,8 +124,6 @@ import {
   sendShockCommand,
   sendNibpTrigger,
 } from "./networkManager.js";
-
-import { GAP_SAMPLES } from "./config.js";
 
 // --- Constants and Registries ---
 const SHOCK_ARTIFACT_AMPLITUDE = 4.0;
@@ -453,6 +453,9 @@ document.addEventListener("DOMContentLoaded", () => {
           ...initialNibp,
           visible: nibpVisSwitch ? nibpVisSwitch.checked : true,
         },
+
+        alarms: JSON.parse(JSON.stringify(DEFAULT_ALARM_THRESHOLDS)),
+
         colors: JSON.parse(JSON.stringify(DEFAULT_COLORS)),
       };
       console.log("[_initializeTargetParams] Initial target params set.");
