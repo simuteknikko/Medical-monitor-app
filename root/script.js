@@ -1281,8 +1281,19 @@ document.addEventListener("DOMContentLoaded", () => {
           this.currentParams = this.currentParams || {};
           this.currentParams.alarms = JSON.parse(JSON.stringify(receivedParams.alarms));
           console.log('[Script] Applied remote alarm thresholds to currentParams:', this.currentParams.alarms);
-          // Update visuals immediately
-          updateAlarmVisuals();
+          // Update visuals and re-evaluate alarms immediately on the monitor
+          try {
+            const currentActive = checkAlarms(this.currentParams);
+            const newlyActive = {};
+            for (const k in currentActive) {
+                if (currentActive[k] && !this.previousActiveAlarms?.[k]) newlyActive[k] = true;
+            }
+            updateAlarmVisuals();
+            try { triggerAlarmSounds(newlyActive); } catch (e) { /* ignore sound errors */ }
+            this.previousActiveAlarms = currentActive;
+          } catch (e) {
+            console.error('[Script] Error evaluating alarms after applying remote thresholds:', e);
+          }
         } catch (e) {
           console.error('[Script] Error applying remote alarm thresholds to currentParams:', e);
         }

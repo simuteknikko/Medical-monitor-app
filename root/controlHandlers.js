@@ -405,6 +405,22 @@ function _handleUpdateVitalsClick(monitorInstance) {
             monitorInstance.updateVitalsDisplay();
         }
 
+        // Re-evaluate alarms immediately so updated thresholds take effect in standalone/setup mode
+        try {
+            if (typeof checkAlarms === 'function') {
+                const currentActive = checkAlarms(monitorInstance.currentParams);
+                const newlyActive = {};
+                for (const k in currentActive) {
+                    if (currentActive[k] && !monitorInstance.previousActiveAlarms?.[k]) newlyActive[k] = true;
+                }
+                updateAlarmVisuals();
+                try { triggerAlarmSounds(newlyActive); } catch (e) { /* ignore sound errors */ }
+                monitorInstance.previousActiveAlarms = currentActive;
+            }
+        } catch (e) {
+            console.error('[_handleUpdateVitalsClick] Error re-evaluating alarms after immediate apply:', e);
+        }
+
         // 3b. Update Colors Immediately
         updateMonitorColors(monitorInstance.currentParams.colors, monitorInstance.charts);
 
@@ -444,8 +460,24 @@ function _handleUpdateVitalsClick(monitorInstance) {
         } else { 
             console.error("[applyFn] initiateParameterChange function not found on monitorInstance!"); 
         }
-        
-        if (monitorInstance.updateVitalsButton) monitorInstance.updateVitalsButton.disabled = true;
+
+            // After initiating parameter change, ensure alarm thresholds are evaluated
+            try {
+                if (typeof checkAlarms === 'function' && monitorInstance.currentParams) {
+                    const currentActive = checkAlarms(monitorInstance.currentParams);
+                    const newlyActive = {};
+                    for (const k in currentActive) {
+                        if (currentActive[k] && !monitorInstance.previousActiveAlarms?.[k]) newlyActive[k] = true;
+                    }
+                    updateAlarmVisuals();
+                    try { triggerAlarmSounds(newlyActive); } catch (e) { /* ignore sound errors */ }
+                    monitorInstance.previousActiveAlarms = currentActive;
+                }
+            } catch (e) {
+                console.error('[applyFn] Error evaluating alarms after parameter change:', e);
+            }
+
+            if (monitorInstance.updateVitalsButton) monitorInstance.updateVitalsButton.disabled = true;
     };
 
     if (delayMs === 0) { 
