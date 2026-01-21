@@ -47,7 +47,7 @@ export function initializeAlarms(monitorElements) {
     visualAlarmElements = {
         ecg: { wrapper: monitorElements?.ecg, value: document.getElementById("hr-value") },
         spo2: { wrapper: monitorElements?.spo2, value: document.getElementById("spo2-value") },
-        abp: { wrapper: monitorElements?.abp, value: document.getElementById("abp-sys-value") },
+        abp: { wrapper: monitorElements?.abp, valueSys: document.getElementById("abp-sys-value"), valueDia: document.getElementById("abp-dia-value"), valueMean: document.getElementById("abp-mean-value") },
         etco2: { wrapper: monitorElements?.etco2, value: document.getElementById("etco2-value") },
     };
 
@@ -88,9 +88,19 @@ function resetActiveAlarms() {
          if (elements?.wrapper) {
              elements.wrapper.classList.remove('alarm-active-low', 'alarm-active-high');
          }
-         if (elements?.value) {
-             elements.value.classList.remove('alarm-value-active');
-         }
+        // Support different value element naming (value, valueSys/valueDia/valueMean)
+        if (elements?.value) {
+            elements.value.classList.remove('alarm-value-active');
+        }
+        if (elements?.valueSys) {
+            elements.valueSys.classList.remove('alarm-value-active');
+        }
+        if (elements?.valueDia) {
+            elements.valueDia.classList.remove('alarm-value-active');
+        }
+        if (elements?.valueMean) {
+            elements.valueMean.classList.remove('alarm-value-active');
+        }
      });
 }
 
@@ -182,8 +192,38 @@ export function checkAlarms(currentParams) {
 export function updateAlarmVisuals() {
     _updateSingleVisual('ecg', 'low_hr', 'high_hr');
     _updateSingleVisual('spo2', 'low_spo2', null);
-    _updateSingleVisual('abp', 'low_abp', 'high_abp');
+    _updateAbpVisuals();
     _updateSingleVisual('etco2', 'low_etco2', 'high_etco2');
+}
+
+function _updateAbpVisuals() {
+    const elements = visualAlarmElements.abp;
+    if (!elements) return;
+
+    const isLowMap = !!activeAlarms['low_map'];
+    const isLowSys = !!activeAlarms['low_abp_sys'];
+    const isLowDia = !!activeAlarms['low_abp_dia'];
+    const isHighSys = !!activeAlarms['high_abp_sys'];
+    const isHighDia = !!activeAlarms['high_abp_dia'];
+
+    // Wrapper: low if any low-type ABP alarm, high if any high-type and no low
+    if (elements.wrapper) {
+        const anyLow = isLowMap || isLowSys || isLowDia;
+        const anyHigh = isHighSys || isHighDia;
+        elements.wrapper.classList.toggle('alarm-active-low', anyLow);
+        elements.wrapper.classList.toggle('alarm-active-high', !!(anyHigh && !anyLow));
+    }
+
+    // Highlight sys/dia/mean numeric values according to which specific alarm triggered
+    if (elements.valueSys) {
+        elements.valueSys.classList.toggle('alarm-value-active', isLowSys || isHighSys);
+    }
+    if (elements.valueDia) {
+        elements.valueDia.classList.toggle('alarm-value-active', isLowDia || isHighDia);
+    }
+    if (elements.valueMean) {
+        elements.valueMean.classList.toggle('alarm-value-active', isLowMap);
+    }
 }
 
 function _updateSingleVisual(paramKey, lowAlarmKey, highAlarmKey) {
