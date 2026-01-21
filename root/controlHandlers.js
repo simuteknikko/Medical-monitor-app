@@ -817,47 +817,17 @@ export function bindControlEvents(monitorInstance) {
         const inputEl = document.getElementById(binding.id);
         const sliderEl = document.getElementById(binding.id + '-slider');
 
-        // Helper to update global state and trigger yellow button
+        // Helper to update global state and mark pending changes (do NOT apply immediately)
         const updateState = (val) => {
             if (isNaN(val) || !monitorInstance.targetParams || !monitorInstance.targetParams.alarms) return;
             // Update target params (pending change)
             monitorInstance.targetParams.alarms[binding.cat][binding.key] = val;
-            // Also apply immediately to currentParams so alarms are evaluated dynamically
-            if (!monitorInstance.currentParams) monitorInstance.currentParams = {};
-            if (!monitorInstance.currentParams.alarms) {
-                monitorInstance.currentParams.alarms = JSON.parse(JSON.stringify(monitorInstance.targetParams.alarms));
-            } else {
-                if (!monitorInstance.currentParams.alarms[binding.cat]) monitorInstance.currentParams.alarms[binding.cat] = {};
-                monitorInstance.currentParams.alarms[binding.cat][binding.key] = val;
-            }
 
-            // Re-evaluate alarms and update visuals/sounds immediately
-            try {
-                const currentActive = checkAlarms(monitorInstance.currentParams);
-                const newlyActive = {};
-                for (const k in currentActive) {
-                    if (currentActive[k] && !monitorInstance.previousActiveAlarms?.[k]) newlyActive[k] = true;
-                }
-                updateAlarmVisuals();
-                triggerAlarmSounds(newlyActive);
-            } catch (e) {
-                console.error('[AlarmBindings] Error re-evaluating alarms:', e);
-            }
+            // Do NOT copy into currentParams here; controller changes must be applied
+            // by pressing the "Update Vitals" button to preserve core program logic.
 
+            // Only mark pending changes and update UI state.
             monitorInstance.showPendingChanges();
-
-            // If we're in multi-device controller mode, immediately send the alarms
-            // subset so monitors receive updated alarm thresholds without requiring
-            // the full "Update Vitals" action.
-            try {
-                if (getCurrentRole && getCurrentRole() === 'controller') {
-                    const alarmsToSend = { alarms: monitorInstance.targetParams.alarms };
-                    sendParamUpdate(alarmsToSend);
-                    console.log('[AlarmBindings] Sent alarm thresholds to monitors:', alarmsToSend);
-                }
-            } catch (e) {
-                console.warn('[AlarmBindings] Failed to send alarm thresholds via network:', e);
-            }
         };
 
         // If user types in the box: update slider and state
