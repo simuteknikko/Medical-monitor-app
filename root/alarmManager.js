@@ -101,7 +101,7 @@ export function checkAlarms(currentParams) {
     const thresholds = currentParams.alarms || {
         ecg: { low: 50, high: 120 },
         spo2: { low: 90 },
-        abp: { low_map: 65 },
+        abp: { low_map: 65, low_sys: 90, low_dia: 60 },
         etco2: { low: 3.0, high: 6.0 }
     };
 
@@ -139,6 +139,27 @@ export function checkAlarms(currentParams) {
             if (map < thresholds.abp.low_map) {
                 nowActive['low_map'] = true;
             }
+            // Systolic/Diastolic specific alarms (low)
+            if (typeof thresholds.abp.low_sys !== 'undefined' && sys < thresholds.abp.low_sys) {
+                nowActive['low_abp_sys'] = true;
+            }
+            if (typeof thresholds.abp.low_dia !== 'undefined' && dia < thresholds.abp.low_dia) {
+                nowActive['low_abp_dia'] = true;
+            }
+            // Systolic/Diastolic specific alarms (high)
+            if (typeof thresholds.abp.high_sys !== 'undefined' && sys > thresholds.abp.high_sys) {
+                nowActive['high_abp_sys'] = true;
+            }
+            if (typeof thresholds.abp.high_dia !== 'undefined' && dia > thresholds.abp.high_dia) {
+                nowActive['high_abp_dia'] = true;
+            }
+            // Aggregate ABP low/high alarms for visuals/sounds
+            if (nowActive['low_map'] || nowActive['low_abp_sys'] || nowActive['low_abp_dia']) {
+                nowActive['low_abp'] = true;
+            }
+            if (nowActive['high_abp_sys'] || nowActive['high_abp_dia']) {
+                nowActive['high_abp'] = true;
+            }
         }
     }
 
@@ -161,7 +182,7 @@ export function checkAlarms(currentParams) {
 export function updateAlarmVisuals() {
     _updateSingleVisual('ecg', 'low_hr', 'high_hr');
     _updateSingleVisual('spo2', 'low_spo2', null);
-    _updateSingleVisual('abp', 'low_map', null);
+    _updateSingleVisual('abp', 'low_abp', 'high_abp');
     _updateSingleVisual('etco2', 'low_etco2', 'high_etco2');
 }
 
@@ -205,9 +226,10 @@ export function triggerAlarmSounds(newlyActiveAlarms) {
     }
 
     let soundProfileToPlay = null;
-    if (activeAlarms['low_spo2'] || activeAlarms['low_map']) {
+    if (activeAlarms['low_spo2'] || activeAlarms['low_abp'] || activeAlarms['low_map']) {
         soundProfileToPlay = ALARM_SOUNDS.critical_low_priority;
-    } else if (activeAlarms['low_hr'] || activeAlarms['high_hr']) {
+    } else if (activeAlarms['low_hr'] || activeAlarms['high_hr'] || activeAlarms['high_abp']) {
+        // Treat high ABP as high-priority audible alarm
         soundProfileToPlay = ALARM_SOUNDS.high_priority;
     } else if (activeAlarms['low_etco2'] || activeAlarms['high_etco2']) {
         soundProfileToPlay = ALARM_SOUNDS.medium_priority;

@@ -537,6 +537,46 @@
                         <input type="number" class="form-control form-control-sm bg-dark text-white" id="alarm-abp-low" min="40" max="100">
                     </div>
                 </div>
+               <!-- New: Systolic and Diastolic alarm limits -->
+               <div class="row g-2 align-items-center mt-2">
+                  <div class="col-3 text-end"><small>Systolic Low:</small></div>
+                  <div class="col-6">
+                     <input type="range" class="form-range" id="alarm-abp-sys-low-slider" min="60" max="200" step="1">
+                  </div>
+                  <div class="col-3">
+                     <input type="number" class="form-control form-control-sm bg-dark text-white" id="alarm-abp-sys-low" min="60" max="200">
+                  </div>
+               </div>
+
+               <div class="row g-2 align-items-center mt-2">
+                  <div class="col-3 text-end"><small>Diastolic Low:</small></div>
+                  <div class="col-6">
+                     <input type="range" class="form-range" id="alarm-abp-dia-low-slider" min="30" max="120" step="1">
+                  </div>
+                  <div class="col-3">
+                     <input type="number" class="form-control form-control-sm bg-dark text-white" id="alarm-abp-dia-low" min="30" max="120">
+                  </div>
+               </div>
+                <!-- ABP High Limits -->
+                <div class="row g-2 align-items-center mt-3">
+                   <div class="col-3 text-end"><small>Systolic High:</small></div>
+                   <div class="col-6">
+                      <input type="range" class="form-range" id="alarm-abp-sys-high-slider" min="90" max="300" step="1">
+                   </div>
+                   <div class="col-3">
+                      <input type="number" class="form-control form-control-sm bg-dark text-white" id="alarm-abp-sys-high" min="90" max="300">
+                   </div>
+                </div>
+
+                <div class="row g-2 align-items-center mt-2">
+                   <div class="col-3 text-end"><small>Diastolic High:</small></div>
+                   <div class="col-6">
+                      <input type="range" class="form-range" id="alarm-abp-dia-high-slider" min="50" max="200" step="1">
+                   </div>
+                   <div class="col-3">
+                      <input type="number" class="form-control form-control-sm bg-dark text-white" id="alarm-abp-dia-high" min="50" max="200">
+                   </div>
+                </div>
             </div>
 
             <div class="mb-2">

@@ -29,6 +29,7 @@ import {
 import { ensureFinite } from "./waveformUtils.js";
 
 import { updateMonitorColors } from "./uiUpdater.js";
+import { checkAlarms, updateAlarmVisuals, triggerAlarmSounds } from './alarmManager.js';
 // Import network functions
 import {
     sendParamUpdate,
@@ -683,6 +684,10 @@ export function bindControlEvents(monitorInstance) {
         { id: 'alarm-ecg-high', cat: 'ecg', key: 'high' },
         { id: 'alarm-spo2-low', cat: 'spo2', key: 'low' },
         { id: 'alarm-abp-low', cat: 'abp', key: 'low_map' },
+        { id: 'alarm-abp-sys-low', cat: 'abp', key: 'low_sys' },
+        { id: 'alarm-abp-sys-high', cat: 'abp', key: 'high_sys' },
+        { id: 'alarm-abp-dia-low', cat: 'abp', key: 'low_dia' },
+        { id: 'alarm-abp-dia-high', cat: 'abp', key: 'high_dia' },
         { id: 'alarm-etco2-low', cat: 'etco2', key: 'low' },
         { id: 'alarm-etco2-high', cat: 'etco2', key: 'high' }
     ];
@@ -693,10 +698,32 @@ export function bindControlEvents(monitorInstance) {
 
         // Helper to update global state and trigger yellow button
         const updateState = (val) => {
-            if (!isNaN(val) && monitorInstance.targetParams && monitorInstance.targetParams.alarms) {
-                monitorInstance.targetParams.alarms[binding.cat][binding.key] = val;
-                monitorInstance.showPendingChanges(); 
+            if (isNaN(val) || !monitorInstance.targetParams || !monitorInstance.targetParams.alarms) return;
+            // Update target params (pending change)
+            monitorInstance.targetParams.alarms[binding.cat][binding.key] = val;
+            // Also apply immediately to currentParams so alarms are evaluated dynamically
+            if (!monitorInstance.currentParams) monitorInstance.currentParams = {};
+            if (!monitorInstance.currentParams.alarms) {
+                monitorInstance.currentParams.alarms = JSON.parse(JSON.stringify(monitorInstance.targetParams.alarms));
+            } else {
+                if (!monitorInstance.currentParams.alarms[binding.cat]) monitorInstance.currentParams.alarms[binding.cat] = {};
+                monitorInstance.currentParams.alarms[binding.cat][binding.key] = val;
             }
+
+            // Re-evaluate alarms and update visuals/sounds immediately
+            try {
+                const currentActive = checkAlarms(monitorInstance.currentParams);
+                const newlyActive = {};
+                for (const k in currentActive) {
+                    if (currentActive[k] && !monitorInstance.previousActiveAlarms?.[k]) newlyActive[k] = true;
+                }
+                updateAlarmVisuals();
+                triggerAlarmSounds(newlyActive);
+            } catch (e) {
+                console.error('[AlarmBindings] Error re-evaluating alarms:', e);
+            }
+
+            monitorInstance.showPendingChanges();
         };
 
         // If user types in the box: update slider and state
@@ -855,22 +882,25 @@ function _updateColorControlsUI(params) {
     if (ecgPicker && colors.ecgColor) ecgPicker.value = colors.ecgColor; if (spo2Picker && colors.spo2Color) spo2Picker.value = colors.spo2Color; if (abpPicker && colors.abpColor) abpPicker.value = colors.abpColor; if (etco2Picker && colors.etco2Color) etco2Picker.value = colors.etco2Color; if (nibpPicker && colors.nibpColor) nibpPicker.value = colors.nibpColor; if (tempPicker && colors.tempColor) tempPicker.value = colors.tempColor;
 
 // Update Alarm Inputs & Sliders from current state
-    if (p.alarms) {
+    if (params.alarms) {
         const syncAlarmControls = (baseId, val) => {
             const inputEl = document.getElementById(baseId);
             const sliderEl = document.getElementById(baseId + '-slider');
-            
             // Set values if elements exist
             if (inputEl) inputEl.value = val;
             if (sliderEl) sliderEl.value = val;
         };
 
-        syncAlarmControls('alarm-ecg-low', p.alarms.ecg.low);
-        syncAlarmControls('alarm-ecg-high', p.alarms.ecg.high);
-        syncAlarmControls('alarm-spo2-low', p.alarms.spo2.low);
-        syncAlarmControls('alarm-abp-low', p.alarms.abp.low_map);
-        syncAlarmControls('alarm-etco2-low', p.alarms.etco2.low);
-        syncAlarmControls('alarm-etco2-high', p.alarms.etco2.high);
+        syncAlarmControls('alarm-ecg-low', params.alarms.ecg.low);
+        syncAlarmControls('alarm-ecg-high', params.alarms.ecg.high);
+        syncAlarmControls('alarm-spo2-low', params.alarms.spo2.low);
+        syncAlarmControls('alarm-abp-low', params.alarms.abp.low_map);
+        syncAlarmControls('alarm-abp-sys-low', params.alarms.abp.low_sys);
+        syncAlarmControls('alarm-abp-sys-high', params.alarms.abp.high_sys);
+        syncAlarmControls('alarm-abp-dia-low', params.alarms.abp.low_dia);
+        syncAlarmControls('alarm-abp-dia-high', params.alarms.abp.high_dia);
+        syncAlarmControls('alarm-etco2-low', params.alarms.etco2.low);
+        syncAlarmControls('alarm-etco2-high', params.alarms.etco2.high);
     }
 }
 
