@@ -1274,6 +1274,19 @@ document.addEventListener("DOMContentLoaded", () => {
           );
         }
       }
+      // If remote provided alarm thresholds, apply them immediately to currentParams
+      // so that alarm evaluation on the monitor reflects new limits without delay.
+      if (receivedParams.alarms) {
+        try {
+          this.currentParams = this.currentParams || {};
+          this.currentParams.alarms = JSON.parse(JSON.stringify(receivedParams.alarms));
+          console.log('[Script] Applied remote alarm thresholds to currentParams:', this.currentParams.alarms);
+          // Update visuals immediately
+          updateAlarmVisuals();
+        } catch (e) {
+          console.error('[Script] Error applying remote alarm thresholds to currentParams:', e);
+        }
+      }
       if (
         this.targetParams.ecg &&
         this.targetParams.ecg.rhythm &&
@@ -1642,7 +1655,18 @@ document.addEventListener("DOMContentLoaded", () => {
                     this.currentParams.abp.dia = targetDia;
                 }
                 this.currentParams.abp.dia = Math.max(0, this.currentParams.abp.dia);
-                this.currentParams.abp.sys = Math.max(this.currentParams.abp.dia + 1, this.currentParams.abp.sys);
+                // If the user recently edited ABP (sys/dia), allow their explicit values
+                // to persist briefly so UI changes are not immediately clamped by interpolation.
+                const nowTs = (Date.now) ? Date.now() : new Date().getTime();
+                const editWindowMs = 2000; // allow 2s grace for user edits
+                const lastEdit = this._lastAbpUserEdit || null;
+                const skipClamp = lastEdit && (nowTs - lastEdit.ts < editWindowMs);
+                if (!skipClamp) {
+                  this.currentParams.abp.sys = Math.max(this.currentParams.abp.dia + 1, this.currentParams.abp.sys);
+                } else {
+                  // respect user-driven systolic for the brief window; only ensure non-negative
+                  this.currentParams.abp.sys = Math.max(0, this.currentParams.abp.sys);
+                }
 
                 if (targetSys === 0 && targetDia === 0 &&
                     Math.abs(this.currentParams.abp.sys) < snap * 2 &&

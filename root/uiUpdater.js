@@ -112,8 +112,11 @@ function _updateAbpDisplay(abpSrc, ecgSrc, currentTime) {
         if (ecgParams) { const isCprArtifact = ecgParams.isArtifact && ecgParams.artifactType === 'cpr'; let rawSys, rawDia;
             if (isCprArtifact) { rawSys = ensureFinite(ecgParams.cpr_abp_sys, 0); rawDia = ensureFinite(ecgParams.cpr_abp_dia, 0); }
             else { rawSys = ensureFinite(abpSrc.sys, 0); rawDia = ensureFinite(abpSrc.dia, 0); }
-             const displayDia = Math.round(Math.max(0, rawDia)); const displaySys = Math.round(Math.max(displayDia, rawSys));
-             sys = displaySys; dia = displayDia; map = (displaySys > displayDia) ? Math.round(displayDia + (displaySys - displayDia) / 3) : '--';
+            const displayDia = Math.round(Math.max(0, rawDia));
+            const displaySys = Math.round(Math.max(0, rawSys));
+            sys = displaySys;
+            dia = displayDia;
+            map = (displaySys > displayDia) ? Math.round(displayDia + (displaySys - displayDia) / 3) : '--';
         } if (sysEl && sysEl.textContent !== String(sys)) sysEl.textContent = sys; if (diaEl && diaEl.textContent !== String(dia)) diaEl.textContent = dia; if (meanEl && meanEl.textContent !== String(map)) meanEl.textContent = map;
     }
      const mapControlEl = document.getElementById("map-display");
