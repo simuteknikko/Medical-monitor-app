@@ -387,6 +387,7 @@
                  </div>
               </div>
            </div>
+ 
            <div class="accordion-item bg-dark text-white">
               <h2 class="accordion-header" id="headingEtco2">
                  <button class="accordion-button collapsed bg-secondary text-white" type="button" data-bs-toggle="collapse" data-bs-target="#etco2Controls" aria-expanded="false" aria-controls="etco2Controls">
@@ -479,6 +480,133 @@
                 </div>
              </div>
           </div>
+        <div class="accordion-item bg-dark text-white border-secondary">
+    <h2 class="accordion-header" id="headingAlarms">
+        <button class="accordion-button collapsed bg-secondary text-white" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAlarms" aria-expanded="false" aria-controls="collapseAlarms">
+            <i class="fas fa-bell me-2"></i> Alarm Limits
+        </button>
+    </h2>
+    <div id="collapseAlarms" class="accordion-collapse collapse" aria-labelledby="headingAlarms" data-bs-parent="#controlAccordion">
+        <div class="accordion-body">
+            
+            <div class="mb-3 border-bottom border-secondary pb-2">
+                <label class="form-label fw-bold text-success"><i class="fas fa-heartbeat me-1"></i> Heart Rate (BPM)</label>
+                
+                <div class="row g-2 align-items-center mb-2">
+                    <div class="col-3 text-end"><small>Low Limit:</small></div>
+                    <div class="col-6">
+                        <input type="range" class="form-range" id="alarm-ecg-low-slider" min="30" max="100" step="1">
+                    </div>
+                    <div class="col-3">
+                        <input type="number" class="form-control form-control-sm bg-dark text-white" id="alarm-ecg-low" min="30" max="100">
+                    </div>
+                </div>
+
+                <div class="row g-2 align-items-center">
+                    <div class="col-3 text-end"><small>High Limit:</small></div>
+                    <div class="col-6">
+                        <input type="range" class="form-range" id="alarm-ecg-high-slider" min="80" max="220" step="1">
+                    </div>
+                    <div class="col-3">
+                        <input type="number" class="form-control form-control-sm bg-dark text-white" id="alarm-ecg-high" min="80" max="220">
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-3 border-bottom border-secondary pb-2">
+                <label class="form-label fw-bold text-info"><i class="fas fa-tint me-1"></i> SpO2 (%)</label>
+                <div class="row g-2 align-items-center">
+                    <div class="col-3 text-end"><small>Low Limit:</small></div>
+                    <div class="col-6">
+                        <input type="range" class="form-range" id="alarm-spo2-low-slider" min="80" max="99" step="1">
+                    </div>
+                    <div class="col-3">
+                        <input type="number" class="form-control form-control-sm bg-dark text-white" id="alarm-spo2-low" min="80" max="99">
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-3 border-bottom border-secondary pb-2">
+                <label class="form-label fw-bold text-danger"><i class="fas fa-wave-square me-1"></i> MAP (mmHg)</label>
+                <div class="row g-2 align-items-center">
+                    <div class="col-3 text-end"><small>Low Limit:</small></div>
+                    <div class="col-6">
+                        <input type="range" class="form-range" id="alarm-abp-low-slider" min="40" max="100" step="1">
+                    </div>
+                    <div class="col-3">
+                        <input type="number" class="form-control form-control-sm bg-dark text-white" id="alarm-abp-low" min="40" max="100">
+                    </div>
+                </div>
+               <!-- New: Systolic and Diastolic alarm limits -->
+               <div class="row g-2 align-items-center mt-2">
+                  <div class="col-3 text-end"><small>Systolic Low:</small></div>
+                  <div class="col-6">
+                     <input type="range" class="form-range" id="alarm-abp-sys-low-slider" min="60" max="200" step="1">
+                  </div>
+                  <div class="col-3">
+                     <input type="number" class="form-control form-control-sm bg-dark text-white" id="alarm-abp-sys-low" min="60" max="200">
+                  </div>
+               </div>
+
+               <div class="row g-2 align-items-center mt-2">
+                  <div class="col-3 text-end"><small>Diastolic Low:</small></div>
+                  <div class="col-6">
+                     <input type="range" class="form-range" id="alarm-abp-dia-low-slider" min="30" max="120" step="1">
+                  </div>
+                  <div class="col-3">
+                     <input type="number" class="form-control form-control-sm bg-dark text-white" id="alarm-abp-dia-low" min="30" max="120">
+                  </div>
+               </div>
+                <!-- ABP High Limits -->
+                <div class="row g-2 align-items-center mt-3">
+                   <div class="col-3 text-end"><small>Systolic High:</small></div>
+                   <div class="col-6">
+                      <input type="range" class="form-range" id="alarm-abp-sys-high-slider" min="90" max="300" step="1">
+                   </div>
+                   <div class="col-3">
+                      <input type="number" class="form-control form-control-sm bg-dark text-white" id="alarm-abp-sys-high" min="90" max="300">
+                   </div>
+                </div>
+
+                <div class="row g-2 align-items-center mt-2">
+                   <div class="col-3 text-end"><small>Diastolic High:</small></div>
+                   <div class="col-6">
+                      <input type="range" class="form-range" id="alarm-abp-dia-high-slider" min="50" max="200" step="1">
+                   </div>
+                   <div class="col-3">
+                      <input type="number" class="form-control form-control-sm bg-dark text-white" id="alarm-abp-dia-high" min="50" max="200">
+                   </div>
+                </div>
+            </div>
+
+            <div class="mb-2">
+                <label class="form-label fw-bold text-warning"><i class="fas fa-wind me-1"></i> ETCO2 (kPa)</label>
+                
+                <div class="row g-2 align-items-center mb-2">
+                    <div class="col-3 text-end"><small>Low Limit:</small></div>
+                    <div class="col-6">
+                        <input type="range" class="form-range" id="alarm-etco2-low-slider" min="1.0" max="5.0" step="0.1">
+                    </div>
+                    <div class="col-3">
+                        <input type="number" class="form-control form-control-sm bg-dark text-white" id="alarm-etco2-low" min="1.0" max="5.0" step="0.1">
+                    </div>
+                </div>
+
+                <div class="row g-2 align-items-center">
+                    <div class="col-3 text-end"><small>High Limit:</small></div>
+                    <div class="col-6">
+                        <input type="range" class="form-range" id="alarm-etco2-high-slider" min="4.0" max="10.0" step="0.1">
+                    </div>
+                    <div class="col-3">
+                        <input type="number" class="form-control form-control-sm bg-dark text-white" id="alarm-etco2-high" min="4.0" max="10.0" step="0.1">
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
           <div class="accordion-item bg-dark text-white">
             <h2 class="accordion-header" id="headingColors">
                <button class="accordion-button collapsed bg-secondary text-white" type="button" data-bs-toggle="collapse" data-bs-target="#colorControls" aria-expanded="false" aria-controls="colorControls">

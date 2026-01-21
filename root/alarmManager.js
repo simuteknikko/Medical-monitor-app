@@ -47,7 +47,7 @@ export function initializeAlarms(monitorElements) {
     visualAlarmElements = {
         ecg: { wrapper: monitorElements?.ecg, value: document.getElementById("hr-value") },
         spo2: { wrapper: monitorElements?.spo2, value: document.getElementById("spo2-value") },
-        abp: { wrapper: monitorElements?.abp, value: document.getElementById("abp-sys-value") },
+        abp: { wrapper: monitorElements?.abp, valueSys: document.getElementById("abp-sys-value"), valueDia: document.getElementById("abp-dia-value"), valueMean: document.getElementById("abp-mean-value") },
         etco2: { wrapper: monitorElements?.etco2, value: document.getElementById("etco2-value") },
     };
 
@@ -88,54 +88,103 @@ function resetActiveAlarms() {
          if (elements?.wrapper) {
              elements.wrapper.classList.remove('alarm-active-low', 'alarm-active-high');
          }
-         if (elements?.value) {
-             elements.value.classList.remove('alarm-value-active');
-         }
+        // Support different value element naming (value, valueSys/valueDia/valueMean)
+        if (elements?.value) {
+            elements.value.classList.remove('alarm-value-active');
+        }
+        if (elements?.valueSys) {
+            elements.valueSys.classList.remove('alarm-value-active');
+        }
+        if (elements?.valueDia) {
+            elements.valueDia.classList.remove('alarm-value-active');
+        }
+        if (elements?.valueMean) {
+            elements.valueMean.classList.remove('alarm-value-active');
+        }
      });
 }
 
 export function checkAlarms(currentParams) {
     if (!currentParams) return {};
-    const nowActive = {};
-    const thresholds = ALARM_THRESHOLDS;
 
-    if (currentParams.ecg?.visible && currentParams.ecg.params &&
-        !currentParams.ecg.params.isFlat && !currentParams.ecg.params.isChaotic &&
-        !currentParams.ecg.params.isPEA && !currentParams.ecg.params.isArtifact) {
-        const hr = ensureFinite(currentParams.ecg.hr, null);
+    // Use dynamic alarms from state, or fallback to defaults
+    const thresholds = currentParams.alarms || {
+        ecg: { low: 50, high: 120 },
+        spo2: { low: 90 },
+        abp: { low_map: 65, low_sys: 90, low_dia: 60 },
+        etco2: { low: 3.0, high: 6.0 }
+    };
+
+    const nowActive = {};
+
+    // 1. CHECK ECG (Heart Rate) - IGNORE if Flatline, VF, PEA, or Artifact
+    if (currentParams.ecg?.visible && 
+        currentParams.ecg.params &&
+        !currentParams.ecg.params.isFlat && 
+        !currentParams.ecg.params.isChaotic && 
+        !currentParams.ecg.params.isPEA && 
+        !currentParams.ecg.params.isArtifact) {
+        
+        const hr = currentParams.ecg.hr;
         if (hr !== null) {
-            if (hr < thresholds.ecg.low_hr) nowActive['low_hr'] = true;
-            if (hr > thresholds.ecg.high_hr) nowActive['high_hr'] = true;
+            if (hr < thresholds.ecg.low) nowActive['low_hr'] = true;
+            if (hr > thresholds.ecg.high) nowActive['high_hr'] = true;
         }
     }
 
+    // 2. CHECK SPO2
     if (currentParams.spo2?.visible) {
-        const spo2 = ensureFinite(currentParams.spo2.value, null);
-         if (spo2 !== null && spo2 > 0 && currentParams.spo2.shape !== 'no_signal') {
-             if (spo2 < thresholds.spo2.low) nowActive['low_spo2'] = true;
-         }
+        const spo2 = currentParams.spo2.value;
+        if (spo2 !== null && spo2 > 0 && currentParams.spo2.shape !== 'no_signal') {
+            if (spo2 < thresholds.spo2.low) nowActive['low_spo2'] = true;
+        }
     }
 
+    // 3. CHECK ABP (MAP)
     if (currentParams.abp?.visible && !(currentParams.ecg?.params?.isArtifact && currentParams.ecg?.params?.artifactType === 'cpr')) {
-         const sys = ensureFinite(currentParams.abp.sys, null);
-         const dia = ensureFinite(currentParams.abp.dia, null);
-         if (sys !== null && dia !== null && sys > 0 && dia >= 0 && sys > dia) {
+        const sys = currentParams.abp.sys;
+        const dia = currentParams.abp.dia;
+        if (sys !== null && dia !== null && sys > 0 && dia >= 0 && sys > dia) {
             const map = Math.round(dia + (sys - dia) / 3);
             if (map < thresholds.abp.low_map) {
                 nowActive['low_map'] = true;
             }
-         }
-    }
-
-    if (currentParams.etco2?.visible) {
-        const valueKpa = ensureFinite(currentParams.etco2.valueKpa, null);
-        if (valueKpa !== null && valueKpa > 0 &&
-            currentParams.etco2.etco2Shape !== 'disconnect' &&
-            currentParams.etco2.etco2Shape !== 'cpr_low_flow') {
-            if (valueKpa < thresholds.etco2.low_kpa) nowActive['low_etco2'] = true;
-            if (valueKpa > thresholds.etco2.high_kpa) nowActive['high_etco2'] = true;
+            // Systolic/Diastolic specific alarms (low)
+            if (typeof thresholds.abp.low_sys !== 'undefined' && sys < thresholds.abp.low_sys) {
+                nowActive['low_abp_sys'] = true;
+            }
+            if (typeof thresholds.abp.low_dia !== 'undefined' && dia < thresholds.abp.low_dia) {
+                nowActive['low_abp_dia'] = true;
+            }
+            // Systolic/Diastolic specific alarms (high)
+            if (typeof thresholds.abp.high_sys !== 'undefined' && sys > thresholds.abp.high_sys) {
+                nowActive['high_abp_sys'] = true;
+            }
+            if (typeof thresholds.abp.high_dia !== 'undefined' && dia > thresholds.abp.high_dia) {
+                nowActive['high_abp_dia'] = true;
+            }
+            // Aggregate ABP low/high alarms for visuals/sounds
+            if (nowActive['low_map'] || nowActive['low_abp_sys'] || nowActive['low_abp_dia']) {
+                nowActive['low_abp'] = true;
+            }
+            if (nowActive['high_abp_sys'] || nowActive['high_abp_dia']) {
+                nowActive['high_abp'] = true;
+            }
         }
     }
+
+    // 4. CHECK ETCO2
+    if (currentParams.etco2?.visible) {
+        const valueKpa = currentParams.etco2.valueKpa;
+        if (valueKpa !== null && valueKpa > 0 && 
+            currentParams.etco2.etco2Shape !== 'disconnect' && 
+            currentParams.etco2.etco2Shape !== 'cpr_low_flow') {
+            
+            if (valueKpa < thresholds.etco2.low) nowActive['low_etco2'] = true;
+            if (valueKpa > thresholds.etco2.high) nowActive['high_etco2'] = true;
+        }
+    }
+
     activeAlarms = nowActive;
     return activeAlarms;
 }
@@ -143,8 +192,38 @@ export function checkAlarms(currentParams) {
 export function updateAlarmVisuals() {
     _updateSingleVisual('ecg', 'low_hr', 'high_hr');
     _updateSingleVisual('spo2', 'low_spo2', null);
-    _updateSingleVisual('abp', 'low_map', null);
+    _updateAbpVisuals();
     _updateSingleVisual('etco2', 'low_etco2', 'high_etco2');
+}
+
+function _updateAbpVisuals() {
+    const elements = visualAlarmElements.abp;
+    if (!elements) return;
+
+    const isLowMap = !!activeAlarms['low_map'];
+    const isLowSys = !!activeAlarms['low_abp_sys'];
+    const isLowDia = !!activeAlarms['low_abp_dia'];
+    const isHighSys = !!activeAlarms['high_abp_sys'];
+    const isHighDia = !!activeAlarms['high_abp_dia'];
+
+    // Wrapper: low if any low-type ABP alarm, high if any high-type and no low
+    if (elements.wrapper) {
+        const anyLow = isLowMap || isLowSys || isLowDia;
+        const anyHigh = isHighSys || isHighDia;
+        elements.wrapper.classList.toggle('alarm-active-low', anyLow);
+        elements.wrapper.classList.toggle('alarm-active-high', !!(anyHigh && !anyLow));
+    }
+
+    // Highlight sys/dia/mean numeric values according to which specific alarm triggered
+    if (elements.valueSys) {
+        elements.valueSys.classList.toggle('alarm-value-active', isLowSys || isHighSys);
+    }
+    if (elements.valueDia) {
+        elements.valueDia.classList.toggle('alarm-value-active', isLowDia || isHighDia);
+    }
+    if (elements.valueMean) {
+        elements.valueMean.classList.toggle('alarm-value-active', isLowMap);
+    }
 }
 
 function _updateSingleVisual(paramKey, lowAlarmKey, highAlarmKey) {
@@ -187,9 +266,10 @@ export function triggerAlarmSounds(newlyActiveAlarms) {
     }
 
     let soundProfileToPlay = null;
-    if (activeAlarms['low_spo2'] || activeAlarms['low_map']) {
+    if (activeAlarms['low_spo2'] || activeAlarms['low_abp'] || activeAlarms['low_map']) {
         soundProfileToPlay = ALARM_SOUNDS.critical_low_priority;
-    } else if (activeAlarms['low_hr'] || activeAlarms['high_hr']) {
+    } else if (activeAlarms['low_hr'] || activeAlarms['high_hr'] || activeAlarms['high_abp']) {
+        // Treat high ABP as high-priority audible alarm
         soundProfileToPlay = ALARM_SOUNDS.high_priority;
     } else if (activeAlarms['low_etco2'] || activeAlarms['high_etco2']) {
         soundProfileToPlay = ALARM_SOUNDS.medium_priority;
