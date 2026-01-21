@@ -1047,6 +1047,19 @@ document.addEventListener("DOMContentLoaded", () => {
         this.interpolationTargetParams = JSON.parse(JSON.stringify(this.targetParams));
         let ecgTimingResetNeeded = false;
 
+        // Apply alarm thresholds immediately to currentParams and interpolationTargetParams
+        // so that calling Update Vitals takes effect for alarm evaluation even while
+        // the numeric interpolation of vitals continues.
+        if (this.targetParams.alarms) {
+          try {
+            this.currentParams.alarms = JSON.parse(JSON.stringify(this.targetParams.alarms));
+            this.interpolationTargetParams.alarms = JSON.parse(JSON.stringify(this.targetParams.alarms));
+            console.log('[initiateParameterChange] Applied alarm thresholds to current and interpolation targets.');
+          } catch (e) {
+            console.error('[initiateParameterChange] Error copying alarm thresholds:', e);
+          }
+        }
+
         // --- KORJATTU OSA: Näkyvyys- ja värimuutosten käsittely ---
         // Sovella näkyvyysmuutokset suoraan ja välittömästi currentParamsiin ja interpolationTargetParamsiin
         for (const key of ["ecg", "spo2", "abp", "etco2", "temp", "nibp"]) {
