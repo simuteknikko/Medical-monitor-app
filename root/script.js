@@ -1047,6 +1047,19 @@ document.addEventListener("DOMContentLoaded", () => {
         this.interpolationTargetParams = JSON.parse(JSON.stringify(this.targetParams));
         let ecgTimingResetNeeded = false;
 
+        // Apply alarm thresholds immediately to currentParams and interpolationTargetParams
+        // so that calling Update Vitals takes effect for alarm evaluation even while
+        // the numeric interpolation of vitals continues.
+        if (this.targetParams.alarms) {
+          try {
+            this.currentParams.alarms = JSON.parse(JSON.stringify(this.targetParams.alarms));
+            this.interpolationTargetParams.alarms = JSON.parse(JSON.stringify(this.targetParams.alarms));
+            console.log('[initiateParameterChange] Applied alarm thresholds to current and interpolation targets.');
+          } catch (e) {
+            console.error('[initiateParameterChange] Error copying alarm thresholds:', e);
+          }
+        }
+
         // --- KORJATTU OSA: Näkyvyys- ja värimuutosten käsittely ---
         // Sovella näkyvyysmuutokset suoraan ja välittömästi currentParamsiin ja interpolationTargetParamsiin
         for (const key of ["ecg", "spo2", "abp", "etco2", "temp", "nibp"]) {
@@ -1272,6 +1285,30 @@ document.addEventListener("DOMContentLoaded", () => {
           this.targetParams[key] = JSON.parse(
             JSON.stringify(receivedParams[key])
           );
+        }
+      }
+      // If remote provided alarm thresholds, apply them immediately to currentParams
+      // so that alarm evaluation on the monitor reflects new limits without delay.
+      if (receivedParams.alarms) {
+        try {
+          this.currentParams = this.currentParams || {};
+          this.currentParams.alarms = JSON.parse(JSON.stringify(receivedParams.alarms));
+          console.log('[Script] Applied remote alarm thresholds to currentParams:', this.currentParams.alarms);
+          // Update visuals and re-evaluate alarms immediately on the monitor
+          try {
+            const currentActive = checkAlarms(this.currentParams);
+            const newlyActive = {};
+            for (const k in currentActive) {
+                if (currentActive[k] && !this.previousActiveAlarms?.[k]) newlyActive[k] = true;
+            }
+            updateAlarmVisuals();
+            try { triggerAlarmSounds(newlyActive); } catch (e) { /* ignore sound errors */ }
+            this.previousActiveAlarms = currentActive;
+          } catch (e) {
+            console.error('[Script] Error evaluating alarms after applying remote thresholds:', e);
+          }
+        } catch (e) {
+          console.error('[Script] Error applying remote alarm thresholds to currentParams:', e);
         }
       }
       if (
@@ -1642,7 +1679,18 @@ document.addEventListener("DOMContentLoaded", () => {
                     this.currentParams.abp.dia = targetDia;
                 }
                 this.currentParams.abp.dia = Math.max(0, this.currentParams.abp.dia);
-                this.currentParams.abp.sys = Math.max(this.currentParams.abp.dia + 1, this.currentParams.abp.sys);
+                // If the user recently edited ABP (sys/dia), allow their explicit values
+                // to persist briefly so UI changes are not immediately clamped by interpolation.
+                const nowTs = (Date.now) ? Date.now() : new Date().getTime();
+                const editWindowMs = 2000; // allow 2s grace for user edits
+                const lastEdit = this._lastAbpUserEdit || null;
+                const skipClamp = lastEdit && (nowTs - lastEdit.ts < editWindowMs);
+                if (!skipClamp) {
+                  this.currentParams.abp.sys = Math.max(this.currentParams.abp.dia + 1, this.currentParams.abp.sys);
+                } else {
+                  // respect user-driven systolic for the brief window; only ensure non-negative
+                  this.currentParams.abp.sys = Math.max(0, this.currentParams.abp.sys);
+                }
 
                 if (targetSys === 0 && targetDia === 0 &&
                     Math.abs(this.currentParams.abp.sys) < snap * 2 &&

@@ -55,6 +55,41 @@ let nextCustomPresetId = 0;
 const CUSTOM_PRESETS_STORAGE_KEY = 'medicalMonitorCustomPresets_v1.1';
 const ADJUST_STEPS = { HR: 5, SPO2: 1, ABP_SYS: 5, ABP_DIA: 5, ETCO2_KPA: 0.1, ETCO2_MMHG: 1, RR: 1, TEMP_C: 0.1, TEMP_F: 0.2 };
 
+// Compute an auto-adjusted diastolic when systolic is driven below diastolic.
+// Uses previous pulse pressure as a guide and clamps to sensible bounds.
+function _computeAutoDiaForSys(newSys, prevSys, prevDia) {
+    const DEFAULT_PP = 40; // typical pulse pressure
+    const MIN_PP = 20; // avoid implausibly narrow PP
+    const MAX_PP = 60; // avoid implausibly wide PP for auto-adjust
+
+    let prevPP = DEFAULT_PP;
+    if (typeof prevSys === 'number' && typeof prevDia === 'number') {
+        prevPP = (prevSys - prevDia) || DEFAULT_PP;
+    }
+    if (!isFinite(prevPP) || prevPP <= 0) prevPP = DEFAULT_PP;
+    const targetPP = Math.max(MIN_PP, Math.min(MAX_PP, Math.round(prevPP)));
+
+    let newDia = Math.round(newSys - targetPP);
+    if (newDia >= newSys) newDia = Math.max(0, newSys - 1);
+    newDia = Math.max(0, newDia);
+    return newDia;
+}
+
+function _computeAutoSysForDia(newDia, prevSys, prevDia) {
+    const DEFAULT_PP = 40;
+    const MIN_PP = 20;
+    const MAX_PP = 60;
+    let prevPP = DEFAULT_PP;
+    if (typeof prevSys === 'number' && typeof prevDia === 'number') {
+        prevPP = (prevSys - prevDia) || DEFAULT_PP;
+    }
+    if (!isFinite(prevPP) || prevPP <= 0) prevPP = DEFAULT_PP;
+    const targetPP = Math.max(MIN_PP, Math.min(MAX_PP, Math.round(prevPP)));
+    let newSys = Math.round(newDia + targetPP);
+    if (newSys <= newDia) newSys = newDia + 1;
+    return Math.max(newSys, newDia + 1);
+}
+
 function _addListener(elementId, eventType, handler) {
     const element = document.getElementById(elementId);
     if(element) { element.addEventListener(eventType, handler); }
@@ -139,8 +174,62 @@ function _handleEcgRhythmChange(event, monitorInstance) {
 function _handleHrSliderInput(event, monitorInstance) { if(!monitorInstance.targetParams.ecg || !monitorInstance.targetParams.ecg.params) return; const ecgParams = monitorInstance.targetParams.ecg.params; const isFixedOrPulseless = monitorInstance.targetParams.ecg.rhythm === 'cpr_artifact' || ecgParams.isPEA || ecgParams.isChaotic || ecgParams.isFlat || monitorInstance.targetParams.ecg.rhythm === 'vt_pulseless'; if (!isFixedOrPulseless) { const { canChangeHR } = monitorInstance._calculateInitialHR(ecgParams, monitorInstance.targetParams.ecg.hr); if(!canChangeHR) { const { initialHR } = monitorInstance._calculateInitialHR(ecgParams, monitorInstance.targetParams.ecg.hr); event.target.value = initialHR >= 0 ? initialHR : event.target.min; monitorInstance.updateSliderDisplays(); return; } } else { event.target.value = 0; monitorInstance.targetParams.ecg.hr = 0; monitorInstance.updateSliderDisplays(); return; } monitorInstance.targetParams.ecg.hr = parseInt(event.target.value, 10); monitorInstance.updateSliderDisplays(); monitorInstance.showPendingChanges(); }
 function _handleSpo2SliderInput(event, monitorInstance) { if(monitorInstance.targetParams.spo2){ monitorInstance.targetParams.spo2.value = parseInt(event.target.value,10); monitorInstance.updateSliderDisplays(); monitorInstance.showPendingChanges(); } }
 function _handleSpo2ShapeChange(event, monitorInstance) { if(monitorInstance.targetParams.spo2) { monitorInstance.targetParams.spo2.shape=event.target.value; monitorInstance.showPendingChanges(); } }
-function _handleAbpSysInput(event, monitorInstance) { if(!monitorInstance.targetParams.abp) return; const newSys=parseInt(event.target.value,10); const dia=monitorInstance.targetParams.abp.dia??0; const validSys=(dia===0&&newSys===0)?0:Math.max(newSys,dia+1); monitorInstance.targetParams.abp.sys=validSys; if(newSys!==validSys) event.target.value=validSys; monitorInstance.updateSliderDisplays(); monitorInstance.showPendingChanges(); }
-function _handleAbpDiaInput(event, monitorInstance) { if(!monitorInstance.targetParams.abp) return; const newDia=parseInt(event.target.value,10); const sys=monitorInstance.targetParams.abp.sys??0; const validDia=(sys===0&&newDia===0)?0:Math.min(newDia,sys-1); monitorInstance.targetParams.abp.dia=Math.max(0,validDia); if(newDia!==monitorInstance.targetParams.abp.dia) event.target.value=monitorInstance.targetParams.abp.dia; monitorInstance.updateSliderDisplays(); monitorInstance.showPendingChanges(); }
+function _handleAbpSysInput(event, monitorInstance) {
+    if(!monitorInstance.targetParams.abp) return;
+    const newSys = parseInt(event.target.value, 10);
+    const dia = monitorInstance.targetParams.abp.dia ?? 0;
+
+    // Preserve existing zero/zero special case
+    if (dia === 0 && newSys === 0) {
+        monitorInstance.targetParams.abp.sys = 0;
+    } else {
+        if (newSys <= dia) {
+            // User lowered systolic below current diastolic: compute a physiologic
+            // diastolic using previous pulse pressure as a guide so the change
+            // remains believable and the user can then fine-tune diastolic.
+            const prevSys = monitorInstance.targetParams.abp.sys ?? newSys;
+            const prevDia = monitorInstance.targetParams.abp.dia ?? dia;
+            const newDia = _computeAutoDiaForSys(newSys, prevSys, prevDia);
+            monitorInstance.targetParams.abp.dia = newDia;
+            monitorInstance.targetParams.abp.sys = newSys;
+            const diaSlider = document.getElementById('abp-dia-slider');
+            if (diaSlider) diaSlider.value = monitorInstance.targetParams.abp.dia;
+        } else {
+            monitorInstance.targetParams.abp.sys = newSys;
+        }
+    }
+
+    // Mark as a recent user edit so animation/interpolation doesn't immediately overwrite
+    try { monitorInstance._lastAbpUserEdit = { type: 'sys', ts: Date.now() }; } catch (e) { /* ignore */ }
+
+    monitorInstance.updateSliderDisplays();
+    monitorInstance.showPendingChanges();
+}
+function _handleAbpDiaInput(event, monitorInstance) {
+    if(!monitorInstance.targetParams.abp) return;
+    const newDia = parseInt(event.target.value, 10);
+    const sys = monitorInstance.targetParams.abp.sys ?? 0;
+    if (!(sys === 0 && newDia === 0) && newDia >= sys) {
+        // User raised diastolic above systolic: auto-raise systolic to maintain
+        // a physiologic pulse pressure (use previous PP as guide).
+        const prevSys = monitorInstance.targetParams.abp.sys ?? sys;
+        const prevDia = monitorInstance.targetParams.abp.dia ?? 0;
+        const suggestedSys = Math.max(sys + 1, prevDia >= 0 ? (newDia + Math.max(20, Math.min(60, Math.round(prevSys - prevDia || 40)))) : (newDia + 1));
+        monitorInstance.targetParams.abp.sys = suggestedSys;
+        monitorInstance.targetParams.abp.dia = Math.max(0, newDia);
+        const sysSlider = document.getElementById('abp-sys-slider');
+        if (sysSlider) sysSlider.value = monitorInstance.targetParams.abp.sys;
+    } else {
+        const validDia = (sys === 0 && newDia === 0) ? 0 : Math.min(newDia, sys - 1);
+        monitorInstance.targetParams.abp.dia = Math.max(0, validDia);
+    }
+    if (newDia !== monitorInstance.targetParams.abp.dia && event.target) event.target.value = monitorInstance.targetParams.abp.dia;
+
+    try { monitorInstance._lastAbpUserEdit = { type: 'dia', ts: Date.now() }; } catch (e) { /* ignore */ }
+
+    monitorInstance.updateSliderDisplays();
+    monitorInstance.showPendingChanges();
+}
 function _handleAbpShapeChange(event, monitorInstance) { if(monitorInstance.targetParams.abp) { monitorInstance.targetParams.abp.shape=event.target.value; monitorInstance.showPendingChanges(); } }
 function _handleEtco2ValueInput(event, monitorInstance) { if(!monitorInstance.targetParams.etco2) return; const sliderValue=parseFloat(event.target.value); const valueKpa=monitorInstance.targetParams.etco2.unitPref==='mmHg'?sliderValue/KPA_TO_MMHG:sliderValue; monitorInstance.targetParams.etco2.valueKpa=valueKpa; monitorInstance.updateSliderDisplays(); monitorInstance.showPendingChanges(); }
 function _handleEtco2RRInput(event, monitorInstance) { if(monitorInstance.targetParams.etco2) { monitorInstance.targetParams.etco2.rr=parseInt(event.target.value,10); monitorInstance.updateSliderDisplays(); monitorInstance.showPendingChanges(); } }
@@ -239,8 +328,40 @@ function _handleAdjustButton(paramType, direction, monitorInstance) {
     let newValue=(direction==='plus')?currentValue+step:currentValue-step;
     if(isFloat){const factor=Math.pow(10,precision);newValue=Math.round(newValue*factor)/factor;}else{newValue=Math.round(newValue);}
     let finalValueToSet=Math.max(sliderMin,Math.min(sliderMax,newValue));
-    if(paramType==='abp-sys'){const currentDia=targetObj.dia??0;if(!(finalValueToSet===0&&currentDia===0)){finalValueToSet=Math.max(finalValueToSet,currentDia+1);}}
-    else if(paramType==='abp-dia'){const currentSys=targetObj.sys??0;if(!(finalValueToSet===0&&currentSys===0)){finalValueToSet=Math.min(finalValueToSet,currentSys-1);finalValueToSet=Math.max(0,finalValueToSet);}else{finalValueToSet=0;}}
+    if (paramType === 'abp-sys') {
+        const currentDia = targetObj.dia ?? 0;
+        if (!(finalValueToSet === 0 && currentDia === 0)) {
+            if (finalValueToSet <= currentDia) {
+                // If user adjusts sys lower than dia via +/- buttons, compute a PP-aware diastolic
+                const prevSys = targetObj.sys ?? currentDia + finalValueToSet;
+                const prevDia = targetObj.dia ?? currentDia;
+                const newDia = _computeAutoDiaForSys(finalValueToSet, prevSys, prevDia);
+                targetObj.dia = newDia;
+            } else {
+                finalValueToSet = Math.max(finalValueToSet, currentDia + 1);
+            }
+        }
+        try { monitorInstance._lastAbpUserEdit = { type: 'sys', ts: Date.now() }; } catch (e) { /* ignore */ }
+    } else if (paramType === 'abp-dia') {
+        const currentSys = targetObj.sys ?? 0;
+        if (!(finalValueToSet === 0 && currentSys === 0)) {
+            // If user attempts to raise dia above or equal to sys via +/- buttons,
+            // auto-raise systolic using PP heuristics so the change stays physiologic.
+            if (finalValueToSet >= currentSys) {
+                const prevSys = targetObj.sys ?? currentSys;
+                const prevDia = targetObj.dia ?? 0;
+                const newSys = _computeAutoSysForDia(finalValueToSet, prevSys, prevDia);
+                targetObj.sys = newSys;
+            }
+            // Recalculate cap against possibly-updated sys
+            const cappedSys = targetObj.sys ?? currentSys;
+            finalValueToSet = Math.min(finalValueToSet, cappedSys - 1);
+            finalValueToSet = Math.max(0, finalValueToSet);
+        } else {
+            finalValueToSet = 0;
+        }
+        try { monitorInstance._lastAbpUserEdit = { type: 'dia', ts: Date.now() }; } catch (e) { /* ignore */ }
+    }
     targetObj[targetSubKey]=finalValueToSet;
     monitorInstance.updateControlsToReflectParams();monitorInstance.updateSliderDisplays();monitorInstance.showPendingChanges();
 }
@@ -284,6 +405,22 @@ function _handleUpdateVitalsClick(monitorInstance) {
             monitorInstance.updateVitalsDisplay();
         }
 
+        // Re-evaluate alarms immediately so updated thresholds take effect in standalone/setup mode
+        try {
+            if (typeof checkAlarms === 'function') {
+                const currentActive = checkAlarms(monitorInstance.currentParams);
+                const newlyActive = {};
+                for (const k in currentActive) {
+                    if (currentActive[k] && !monitorInstance.previousActiveAlarms?.[k]) newlyActive[k] = true;
+                }
+                updateAlarmVisuals();
+                try { triggerAlarmSounds(newlyActive); } catch (e) { /* ignore sound errors */ }
+                monitorInstance.previousActiveAlarms = currentActive;
+            }
+        } catch (e) {
+            console.error('[_handleUpdateVitalsClick] Error re-evaluating alarms after immediate apply:', e);
+        }
+
         // 3b. Update Colors Immediately
         updateMonitorColors(monitorInstance.currentParams.colors, monitorInstance.charts);
 
@@ -323,8 +460,24 @@ function _handleUpdateVitalsClick(monitorInstance) {
         } else { 
             console.error("[applyFn] initiateParameterChange function not found on monitorInstance!"); 
         }
-        
-        if (monitorInstance.updateVitalsButton) monitorInstance.updateVitalsButton.disabled = true;
+
+            // After initiating parameter change, ensure alarm thresholds are evaluated
+            try {
+                if (typeof checkAlarms === 'function' && monitorInstance.currentParams) {
+                    const currentActive = checkAlarms(monitorInstance.currentParams);
+                    const newlyActive = {};
+                    for (const k in currentActive) {
+                        if (currentActive[k] && !monitorInstance.previousActiveAlarms?.[k]) newlyActive[k] = true;
+                    }
+                    updateAlarmVisuals();
+                    try { triggerAlarmSounds(newlyActive); } catch (e) { /* ignore sound errors */ }
+                    monitorInstance.previousActiveAlarms = currentActive;
+                }
+            } catch (e) {
+                console.error('[applyFn] Error evaluating alarms after parameter change:', e);
+            }
+
+            if (monitorInstance.updateVitalsButton) monitorInstance.updateVitalsButton.disabled = true;
     };
 
     if (delayMs === 0) { 
@@ -696,33 +849,16 @@ export function bindControlEvents(monitorInstance) {
         const inputEl = document.getElementById(binding.id);
         const sliderEl = document.getElementById(binding.id + '-slider');
 
-        // Helper to update global state and trigger yellow button
+        // Helper to update global state and mark pending changes (do NOT apply immediately)
         const updateState = (val) => {
             if (isNaN(val) || !monitorInstance.targetParams || !monitorInstance.targetParams.alarms) return;
             // Update target params (pending change)
             monitorInstance.targetParams.alarms[binding.cat][binding.key] = val;
-            // Also apply immediately to currentParams so alarms are evaluated dynamically
-            if (!monitorInstance.currentParams) monitorInstance.currentParams = {};
-            if (!monitorInstance.currentParams.alarms) {
-                monitorInstance.currentParams.alarms = JSON.parse(JSON.stringify(monitorInstance.targetParams.alarms));
-            } else {
-                if (!monitorInstance.currentParams.alarms[binding.cat]) monitorInstance.currentParams.alarms[binding.cat] = {};
-                monitorInstance.currentParams.alarms[binding.cat][binding.key] = val;
-            }
 
-            // Re-evaluate alarms and update visuals/sounds immediately
-            try {
-                const currentActive = checkAlarms(monitorInstance.currentParams);
-                const newlyActive = {};
-                for (const k in currentActive) {
-                    if (currentActive[k] && !monitorInstance.previousActiveAlarms?.[k]) newlyActive[k] = true;
-                }
-                updateAlarmVisuals();
-                triggerAlarmSounds(newlyActive);
-            } catch (e) {
-                console.error('[AlarmBindings] Error re-evaluating alarms:', e);
-            }
+            // Do NOT copy into currentParams here; controller changes must be applied
+            // by pressing the "Update Vitals" button to preserve core program logic.
 
+            // Only mark pending changes and update UI state.
             monitorInstance.showPendingChanges();
         };
 
