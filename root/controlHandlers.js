@@ -418,8 +418,19 @@ function _handleUpdateVitalsClick(monitorInstance) {
                 for (const k in currentActive) {
                     if (currentActive[k] && !monitorInstance.previousActiveAlarms?.[k]) newlyActive[k] = true;
                 }
-                updateAlarmVisuals();
-                try { triggerAlarmSounds(newlyActive); } catch (e) { /* ignore sound errors */ }
+                // Only update visuals/play sounds on an active monitor device
+                try {
+                    const role = getCurrentRole();
+                    if (role === 'monitor' && monitorInstance.animationRunning) {
+                        updateAlarmVisuals();
+                        try { triggerAlarmSounds(newlyActive); } catch (e) { /* ignore sound errors */ }
+                    } else {
+                        // Ensure sounds are not playing on non-monitor or inactive monitor
+                        try { /* call stop via imported manager indirectly by updateAlarmVisuals in script when stopping */ } catch(e){}
+                    }
+                } catch (e) {
+                    console.error('[_handleUpdateVitalsClick] Error while gating alarm visuals/sounds:', e);
+                }
                 monitorInstance.previousActiveAlarms = currentActive;
             }
         } catch (e) {
@@ -474,8 +485,15 @@ function _handleUpdateVitalsClick(monitorInstance) {
                     for (const k in currentActive) {
                         if (currentActive[k] && !monitorInstance.previousActiveAlarms?.[k]) newlyActive[k] = true;
                     }
-                    updateAlarmVisuals();
-                    try { triggerAlarmSounds(newlyActive); } catch (e) { /* ignore sound errors */ }
+                    try {
+                        const role = getCurrentRole();
+                        if (role === 'monitor' && monitorInstance.animationRunning) {
+                            updateAlarmVisuals();
+                            try { triggerAlarmSounds(newlyActive); } catch (e) { /* ignore sound errors */ }
+                        }
+                    } catch (e) {
+                        console.error('[applyFn] Error while gating alarm visuals/sounds:', e);
+                    }
                     monitorInstance.previousActiveAlarms = currentActive;
                 }
             } catch (e) {
