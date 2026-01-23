@@ -513,7 +513,6 @@ function _applyCustomPreset(presetParams, monitorInstance) { if (!presetParams) 
 function _getSelectedCaseId() {
     const sel = document.getElementById('case-select');
     if (sel && sel.value) return sel.value;
-    if (loadedCases && loadedCases.length > 0) return loadedCases[0].id;
     return null;
 }
 
@@ -525,6 +524,20 @@ function _saveCasesToStorage() {
         console.error('[_saveCasesToStorage] Error saving cases to localStorage:', error);
         alert('Warning: Could not save cases to browser storage. They will be lost on page reload.');
     }
+}
+
+function _updateCaseUIState(monitorInstance) {
+    const hasCase = Array.isArray(loadedCases) && loadedCases.length > 0 && loadedCases.some(c => !!c.id && c.presets);
+    const savePresetBtn = document.getElementById('save-custom-preset-button');
+    const uploadPresetBtn = document.getElementById('upload-custom-preset-button');
+    const presetFileInput = document.getElementById('preset-file-input');
+    const saveCaseBtn = document.getElementById('save-case-button');
+    const deleteCaseBtn = document.getElementById('delete-case-button');
+    if (savePresetBtn) savePresetBtn.disabled = !hasCase;
+    if (uploadPresetBtn) uploadPresetBtn.disabled = !hasCase;
+    if (presetFileInput) presetFileInput.disabled = !hasCase;
+    if (saveCaseBtn) saveCaseBtn.disabled = !hasCase;
+    if (deleteCaseBtn) deleteCaseBtn.disabled = !hasCase;
 }
 
 function _renderPresetsForSelectedCase(monitorInstance) {
@@ -547,12 +560,16 @@ function _renderPresetsForSelectedCase(monitorInstance) {
 function _addPresetButtonForCase(caseId, presetObj, monitorInstance) {
     const container = document.getElementById('custom-preset-buttons-container');
     if (!container) { console.error("[_addPresetButtonForCase] Custom preset button container not found."); return; }
+    const wrapper = document.createElement('div');
+    wrapper.classList.add('preset-item', 'd-inline-flex', 'align-items-center', 'mb-2', 'me-2');
+
     const button = document.createElement('button');
     button.type = 'button';
-    button.classList.add('btn', 'btn-info', 'btn-sm', 'mb-2', 'me-2');
+    button.classList.add('btn', 'btn-info', 'btn-sm');
     button.textContent = presetObj.name || 'Unnamed Preset';
     button.dataset.presetId = presetObj.id;
     button.dataset.caseId = caseId;
+    button.style.marginRight = '6px';
     button.addEventListener('click', () => {
         console.log(`[Custom Preset Button] Clicked: ${presetObj.name} (ID: ${presetObj.id}) in case ${caseId}`);
         const targetCase = loadedCases.find(c => c.id === caseId);
@@ -566,8 +583,34 @@ function _addPresetButtonForCase(caseId, presetObj, monitorInstance) {
         console.error(`[_addPresetButtonForCase] Could not find preset ${presetObj.id} in case ${caseId}`);
         alert('Error: Preset data not found.');
     });
-    container.appendChild(button);
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.classList.add('btn', 'btn-outline-danger', 'btn-sm', 'preset-delete-btn');
+    delBtn.title = 'Delete preset';
+    delBtn.innerHTML = '<i class="fas fa-trash"></i>';
+    delBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        _deletePresetFromCase(caseId, presetObj.id, monitorInstance);
+    });
+
+    wrapper.appendChild(button);
+    wrapper.appendChild(delBtn);
+    container.appendChild(wrapper);
     console.log(`[_addPresetButtonForCase] Added button for preset: ${presetObj.name} (ID: ${presetObj.id})`);
+}
+
+function _deletePresetFromCase(caseId, presetId, monitorInstance) {
+    const targetCase = loadedCases.find(c => c.id === caseId);
+    if (!targetCase) { alert('Case not found.'); return; }
+    const idx = targetCase.presets.findIndex(p => p.id === presetId);
+    if (idx === -1) { alert('Preset not found.'); return; }
+    const presetName = targetCase.presets[idx].name || presetId;
+    if (!confirm(`Delete preset '${presetName}' from case '${targetCase.name}'?`)) return;
+    targetCase.presets.splice(idx, 1);
+    _saveCasesToStorage();
+    _renderPresetsForSelectedCase(monitorInstance);
+    alert(`Preset '${presetName}' deleted.`);
 }
 
 function _applyPresetParameters(presetParamsToApply, monitorInstance) {
@@ -668,12 +711,14 @@ function _handleSavePreset(monitorInstance) {
 
     // Save into currently selected case and persist to cache
     let caseId = _getSelectedCaseId();
+    if (!caseId) {
+        alert('Please create or select a case before saving a preset. Use "New Case".');
+        return;
+    }
     let targetCase = loadedCases.find(c => c.id === caseId);
     if (!targetCase) {
-        targetCase = { id: caseId || `case-${nextCaseId++}`, name: 'Default Case', presets: [] };
-        loadedCases.push(targetCase);
-        const sel = document.getElementById('case-select');
-        if (sel) { const opt = document.createElement('option'); opt.value = targetCase.id; opt.textContent = targetCase.name; sel.appendChild(opt); sel.value = targetCase.id; }
+        alert('Selected case not found. Please recreate or select a different case.');
+        return;
     }
     const presetObj = { id: `preset-${nextCustomPresetId++}`, name: presetName, params: paramsToSave };
     targetCase.presets.push(presetObj);
@@ -747,14 +792,9 @@ function _handleLoadPresetFile(event, monitorInstance) {
                     let caseId = _getSelectedCaseId();
                     let targetCase = loadedCases.find(c => c.id === caseId);
                     if (!targetCase) {
-                        const newCase = { id: caseId || `case-${nextCaseId++}`, name: 'Default Case', presets: [] };
-                        loadedCases.push(newCase);
-                        targetCase = newCase;
-                        // update case select UI if present
-                        const sel = document.getElementById('case-select');
-                        if (sel) {
-                            const opt = document.createElement('option'); opt.value = targetCase.id; opt.textContent = targetCase.name; sel.appendChild(opt); sel.value = targetCase.id;
-                        }
+                        alert('No case selected. Create or select a case before loading presets.');
+                        if(event.target) event.target.value = null;
+                        return;
                     }
 
                     allLoadedPresetsFromFile.forEach(preset => {
@@ -784,13 +824,9 @@ function _handleLoadPresetFile(event, monitorInstance) {
                 let caseId = _getSelectedCaseId();
                 let targetCase = loadedCases.find(c => c.id === caseId);
                 if (!targetCase) {
-                    const newCase = { id: caseId || `case-${nextCaseId++}`, name: 'Default Case', presets: [] };
-                    loadedCases.push(newCase);
-                    targetCase = newCase;
-                    const sel = document.getElementById('case-select');
-                    if (sel) {
-                        const opt = document.createElement('option'); opt.value = targetCase.id; opt.textContent = targetCase.name; sel.appendChild(opt); sel.value = targetCase.id;
-                    }
+                    alert('No case selected. Create or select a case before loading presets.');
+                    if(event.target) event.target.value = null;
+                    return;
                 }
                 allLoadedPresetsFromFile.forEach(preset => {
                     const presetObj = { id: `preset-${nextCustomPresetId++}`, name: preset.name, params: preset.params };
@@ -852,21 +888,25 @@ function _loadCasesFromStorage(monitorInstance) {
         }
 
         // Ensure at least one case exists
-        if (loadedCases.length === 0) {
-            loadedCases.push({ id: `case-${nextCaseId++}`, name: 'Default Case', presets: [] });
-        }
-
-        // Populate case select
+        // If no cases exist, prompt user to create one (do not auto-create)
         const sel = document.getElementById('case-select');
         if (sel) {
             sel.innerHTML = '';
-            loadedCases.forEach(c => {
-                const opt = document.createElement('option'); opt.value = c.id; opt.textContent = c.name; sel.appendChild(opt);
-            });
-            sel.value = loadedCases[0].id;
+            if (loadedCases.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = '-- Create a case first --';
+                sel.appendChild(opt);
+            } else {
+                loadedCases.forEach(c => {
+                    const opt = document.createElement('option'); opt.value = c.id; opt.textContent = c.name; sel.appendChild(opt);
+                });
+                sel.value = loadedCases[0].id;
+            }
         }
 
         _renderPresetsForSelectedCase(monitorInstance);
+        _updateCaseUIState(monitorInstance);
     } catch (error) {
         console.error('[_loadCasesFromStorage] Error loading cases from storage:', error);
     }
@@ -963,6 +1003,7 @@ export function bindControlEvents(monitorInstance) {
     _addListener("preset-file-input", "change", (e) => _handleLoadPresetFile(e, monitorInstance));
     _addListener('case-select', 'change', (e) => {
         _renderPresetsForSelectedCase(monitorInstance);
+        _updateCaseUIState(monitorInstance);
     });
     _addListener('new-case-button', 'click', () => _handleNewCase(monitorInstance));
     _addListener('delete-case-button', 'click', () => _handleDeleteCase(monitorInstance));
