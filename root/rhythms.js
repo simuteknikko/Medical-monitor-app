@@ -178,7 +178,7 @@ export const RHYTHM_PARAMS = {
     t_width: 0.07,
     pr_interval: 0,
     t_mean_offset: 0.22,
-    noise_amp: 0.03,
+    noise_amp: 0.05,
   },
   svt: {
     generatorType: "pqrst",
