@@ -112,7 +112,7 @@ function _handleEcgRhythmChange(event, monitorInstance) {
      const rhythmKey = event.target.value;
      const newParamsFromRhythms = RHYTHM_PARAMS[rhythmKey];
 
-     if(newParamsFromRhythms && monitorInstance.targetParams.ecg){
+    if(newParamsFromRhythms && monitorInstance.targetParams.ecg) {
          const rhythmChanged = monitorInstance.targetParams.ecg.rhythm !== rhythmKey;
          monitorInstance.targetParams.ecg.rhythm = rhythmKey;
          monitorInstance.targetParams.ecg.params = JSON.parse(JSON.stringify(newParamsFromRhythms));
@@ -272,6 +272,73 @@ function _handleActivateClick(monitorInstance) {
     if (activateButton) { activateButton.textContent = monitorInstance.animationRunning ? "Deactivate Monitor" : "Activate Monitor"; activateButton.classList.toggle("btn-success", !monitorInstance.animationRunning); activateButton.classList.toggle("btn-danger", monitorInstance.animationRunning); }
 }
 function _handleEcgShock(monitorInstance) { if(monitorInstance && monitorInstance.animationRunning){ console.log("[_handleEcgShock] Shock button clicked."); monitorInstance.requestShock(); } else { console.log("[_handleEcgShock] Shock ignored (simulation not active)."); } }
+
+function _handleCprToggle(monitorInstance) {
+    if (!monitorInstance || !monitorInstance.targetParams) return;
+    const btn = document.getElementById('ecg-cpr-toggle');
+    if (!btn) return;
+
+    const isActive = !!monitorInstance._cprOverrideActive;
+
+    if (!isActive) {
+        // Activate CPR override: save current targetParams and immediately apply CPR artifact
+        try { monitorInstance._cprSavedTargetParams = JSON.parse(JSON.stringify(monitorInstance.targetParams)); } catch (e) { monitorInstance._cprSavedTargetParams = null; }
+
+        const cprParams = RHYTHM_PARAMS['cpr_artifact'] ? JSON.parse(JSON.stringify(RHYTHM_PARAMS['cpr_artifact'])) : null;
+        if (!cprParams) { console.error('[CPR Toggle] cpr_artifact params missing'); return; }
+
+        monitorInstance.targetParams.ecg = monitorInstance.targetParams.ecg || {};
+        monitorInstance.targetParams.ecg.rhythm = 'cpr_artifact';
+        monitorInstance.targetParams.ecg.params = cprParams;
+        monitorInstance.targetParams.ecg.hr = 0;
+
+        if (monitorInstance.targetParams.spo2) {
+            monitorInstance.targetParams.spo2.value = cprParams.spo2Value ?? 0;
+            monitorInstance.targetParams.spo2.shape = cprParams.spo2Shape ?? monitorInstance.targetParams.spo2.shape;
+        }
+        if (monitorInstance.targetParams.abp) {
+            monitorInstance.targetParams.abp.sys = cprParams.cpr_abp_sys ?? (monitorInstance.targetParams.abp.sys || 0);
+            monitorInstance.targetParams.abp.dia = cprParams.cpr_abp_dia ?? (monitorInstance.targetParams.abp.dia || 0);
+            monitorInstance.targetParams.abp.shape = cprParams.cpr_abp_shape ?? monitorInstance.targetParams.abp.shape;
+        }
+        if (monitorInstance.targetParams.etco2) {
+            monitorInstance.targetParams.etco2.valueKpa = cprParams.etco2ValueKpa ?? monitorInstance.targetParams.etco2.valueKpa;
+            monitorInstance.targetParams.etco2.rr = cprParams.respiratoryRate ?? monitorInstance.targetParams.etco2.rr;
+            monitorInstance.targetParams.etco2.etco2Shape = cprParams.etco2Shape ?? monitorInstance.targetParams.etco2.etco2Shape;
+        }
+
+        try { monitorInstance.currentParams = JSON.parse(JSON.stringify(monitorInstance.targetParams)); } catch (e) { /* ignore */ }
+
+        monitorInstance._cprOverrideActive = true;
+        btn.classList.add('active');
+        btn.textContent = 'CPR Artifact: ON';
+
+        monitorInstance.updateControlsToReflectParams();
+        monitorInstance.updateSliderDisplays();
+        monitorInstance.showPendingChanges();
+
+        try { const role = getCurrentRole(); if (role === 'controller') { const paramsToSend = { ...monitorInstance.targetParams }; delete paramsToSend.params; sendParamUpdate(paramsToSend); console.log('[CPR Toggle] Sent CPR param update to session.'); } } catch (e) { console.error('[CPR Toggle] Network send error', e); }
+    } else {
+        // Deactivate: restore saved target params
+        const saved = monitorInstance._cprSavedTargetParams;
+        if (saved) {
+            monitorInstance.targetParams = JSON.parse(JSON.stringify(saved));
+            try { monitorInstance.currentParams = JSON.parse(JSON.stringify(saved)); } catch (e) { /* ignore */ }
+        } else {
+            console.warn('[CPR Toggle] No saved params to restore.');
+        }
+        monitorInstance._cprSavedTargetParams = null;
+        monitorInstance._cprOverrideActive = false;
+        btn.classList.remove('active');
+        btn.textContent = 'Toggle CPR Artifact';
+
+        monitorInstance.updateControlsToReflectParams();
+        monitorInstance.updateSliderDisplays();
+        monitorInstance.showPendingChanges();
+
+        try { const role = getCurrentRole(); if (role === 'controller') { const paramsToSend = { ...monitorInstance.targetParams }; delete paramsToSend.params; sendParamUpdate(paramsToSend); console.log('[CPR Toggle] Sent restore param update to session.'); } } catch (e) { console.error('[CPR Toggle] Network send error', e); }
+    }
+}
 
 function _handleAdjustButton(paramType, direction, monitorInstance) {
     let sliderId, targetParamKey, targetSubKey, step, isFloat=false, precision=0;
@@ -983,6 +1050,7 @@ export function bindControlEvents(monitorInstance) {
     _addListener("ecg-rhythm-select", "change", (e) => _handleEcgRhythmChange(e, monitorInstance));
     _addListener("hr-slider", "input", (e) => _handleHrSliderInput(e, monitorInstance));
     _addListener("ecg-shock-button", "click", () => _handleEcgShock(monitorInstance));
+    _addListener("ecg-cpr-toggle", "click", () => _handleCprToggle(monitorInstance));
     _addListener("hr-minus-btn", "click", () => _handleAdjustButton('hr', 'minus', monitorInstance));
     _addListener("hr-plus-btn", "click", () => _handleAdjustButton('hr', 'plus', monitorInstance));
     _addListener("spo2-slider", "input", (e) => _handleSpo2SliderInput(e, monitorInstance));
@@ -1180,7 +1248,7 @@ export function updateControlsToReflectParams(monitorInstance) {
     catch(error) { console.error("[updateControlsToReflectParams] Error updating controls UI:", error); }
 }
 function _updateVisibilitySwitches(params) { const ecgVisSwitch = document.getElementById("ecg-visibility-switch"); const spo2VisSwitch = document.getElementById("spo2-visibility-switch"); const abpVisSwitch = document.getElementById("abp-visibility-switch"); const etco2VisSwitch = document.getElementById("etco2-visibility-switch"); const nibpVisSwitch = document.getElementById("nibp-visibility-switch"); const tempVisSwitch = document.getElementById("temp-visibility-switch"); if(ecgVisSwitch&&params.ecg) ecgVisSwitch.checked=params.ecg.visible; if(spo2VisSwitch&&params.spo2) spo2VisSwitch.checked=params.spo2.visible; if(abpVisSwitch&&params.abp) abpVisSwitch.checked=params.abp.visible; if(etco2VisSwitch&&params.etco2) etco2VisSwitch.checked=params.etco2.visible; if(nibpVisSwitch&&params.nibp) nibpVisSwitch.checked=params.nibp.visible; if(tempVisSwitch&&params.temp) tempVisSwitch.checked=params.temp.visible; }
-function _updateEcgControlsUI(params, calculateInitialHRFunc) { const rhythmSelect=document.getElementById("ecg-rhythm-select"); const hrSlider=document.getElementById("hr-slider"); const hrSliderDisplay=document.getElementById("hr-slider-display"); if(rhythmSelect&&params.ecg){ rhythmSelect.value=params.ecg.rhythm; } if(params.ecg&&calculateInitialHRFunc&&params.ecg.params&&hrSlider&&hrSliderDisplay){ const ecgParams=params.ecg.params; const targetHRValue=params.ecg.hr; const isCprOrPulseless=params.ecg.rhythm==='cpr_artifact'||ecgParams.isPEA||ecgParams.isChaotic||ecgParams.isFlat||params.ecg.rhythm==='vt_pulseless'; const {canChangeHR}=calculateInitialHRFunc(ecgParams,targetHRValue); const enableSlider=!isCprOrPulseless&&canChangeHR; hrSlider.value=ensureFinite(targetHRValue,0); hrSlider.disabled=!enableSlider; hrSliderDisplay.textContent=ensureFinite(targetHRValue,0); }else if(hrSliderDisplay){ hrSliderDisplay.textContent='N/A'; if(hrSlider)hrSlider.disabled=true; } }
+function _updateEcgControlsUI(params, calculateInitialHRFunc) { const rhythmSelect=document.getElementById("ecg-rhythm-select"); const hrSlider=document.getElementById("hr-slider"); const hrSliderDisplay=document.getElementById("hr-slider-display"); if(rhythmSelect&&params.ecg){ rhythmSelect.value=params.ecg.rhythm; try { rhythmSelect.disabled = (params.ecg.rhythm === 'cpr_artifact'); } catch(e){} } if(params.ecg&&calculateInitialHRFunc&&params.ecg.params&&hrSlider&&hrSliderDisplay){ const ecgParams=params.ecg.params; const targetHRValue=params.ecg.hr; const isCprOrPulseless=params.ecg.rhythm==='cpr_artifact'||ecgParams.isPEA||ecgParams.isChaotic||ecgParams.isFlat||params.ecg.rhythm==='vt_pulseless'; const {canChangeHR}=calculateInitialHRFunc(ecgParams,targetHRValue); const enableSlider=!isCprOrPulseless&&canChangeHR; hrSlider.value=ensureFinite(targetHRValue,0); hrSlider.disabled=!enableSlider; hrSliderDisplay.textContent=ensureFinite(targetHRValue,0); }else if(hrSliderDisplay){ hrSliderDisplay.textContent='N/A'; if(hrSlider)hrSlider.disabled=true; } }
 function _updateSpo2ControlsUI(params) {
     const spo2Slider=document.getElementById("spo2-slider");
     const spo2ShapeSelect=document.getElementById("spo2-shape-select");
