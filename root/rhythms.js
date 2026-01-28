@@ -357,8 +357,10 @@ export const RHYTHM_PARAMS = {
     s_amp_factor: 0.15,
     t_amp: 0.28,
     t_width: 0.07,
-    pr_interval: 0.24,
-    t_mean_offset: 0.25 + (0.24 - 0.16),
+      pr_interval: 0.40, // prolonged PR (>200 ms) per request
+      p_duration: 0.10, // fixed P-wave duration so P shape remains natural
+      // Keep T offset relative to QRS constant; don't add extra PR-dependent shift
+      t_mean_offset: 0.25,
     noise_amp: 0.015,
   },
   avb2m1: {

@@ -28,7 +28,9 @@ export function generatePQRST(t_relative, params) {
 
     // P-aalto
     if (hasP && p_amp !== 0 && pr_interval > 0) {
-        const p_duration = pr_interval * 0.7;
+        // Prevent P-wave from becoming unrealistically long when PR is prolonged.
+        // Allow override with `params.p_duration` for specific rhythms.
+        const p_duration = params?.p_duration ?? Math.min(pr_interval * 0.7, 0.12);
         if (p_duration > 1e-3 && t_relative >= 0 && t_relative < p_duration) {
             const Bp = Math.PI / p_duration;
             p_value = p_amp * Math.sin(Bp * t_relative);
