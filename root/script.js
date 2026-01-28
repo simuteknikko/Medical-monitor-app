@@ -1301,8 +1301,16 @@ document.addEventListener("DOMContentLoaded", () => {
             for (const k in currentActive) {
                 if (currentActive[k] && !this.previousActiveAlarms?.[k]) newlyActive[k] = true;
             }
-            updateAlarmVisuals();
-            try { triggerAlarmSounds(newlyActive); } catch (e) { /* ignore sound errors */ }
+            // Only update visuals/play sounds on active monitor devices
+            try {
+                const role = getCurrentRole();
+                if (role === 'monitor' && this.animationRunning) {
+                    updateAlarmVisuals();
+                    try { triggerAlarmSounds(newlyActive); } catch (e) { /* ignore sound errors */ }
+                }
+            } catch (e) {
+                console.error('[Script] Error while gating alarm visuals/sounds:', e);
+            }
             this.previousActiveAlarms = currentActive;
           } catch (e) {
             console.error('[Script] Error evaluating alarms after applying remote thresholds:', e);
@@ -1692,11 +1700,10 @@ document.addEventListener("DOMContentLoaded", () => {
                   this.currentParams.abp.sys = Math.max(0, this.currentParams.abp.sys);
                 }
 
-                if (targetSys === 0 && targetDia === 0 &&
-                    Math.abs(this.currentParams.abp.sys) < snap * 2 &&
-                    Math.abs(this.currentParams.abp.dia) < snap * 2) {
-                    this.currentParams.abp.sys = 0;
-                    this.currentParams.abp.dia = 0;
+                if (targetSys === 0 && targetDia === 0) {
+                  // If target ABP is explicitly zero (pulseless rhythm), snap immediately to zeros
+                  this.currentParams.abp.sys = 0;
+                  this.currentParams.abp.dia = 0;
                 }
                 if (this.currentParams.abp.shape !== this.interpolationTargetParams.abp.shape && !this.isAbpUpdatePending) { // Apply shape if not pending
                     this.currentParams.abp.shape = this.interpolationTargetParams.abp.shape;
@@ -1737,8 +1744,15 @@ document.addEventListener("DOMContentLoaded", () => {
                     newlyActiveAlarms[key] = true;
                 }
             }
-            updateAlarmVisuals();
-            triggerAlarmSounds(newlyActiveAlarms);
+            try {
+              const role = getCurrentRole();
+              if (role === 'monitor' && this.animationRunning) {
+                updateAlarmVisuals();
+                triggerAlarmSounds(newlyActiveAlarms);
+              }
+            } catch (e) {
+              console.error('[Script] Error gating alarm visuals/sounds:', e);
+            }
             this.previousActiveAlarms = currentActiveAlarms;
         } catch (e) {
             console.error("Error during alarm processing:", e);

@@ -53,6 +53,11 @@ const PRESETS = {
 let loadedCustomPresets = [];
 let nextCustomPresetId = 0;
 const CUSTOM_PRESETS_STORAGE_KEY = 'medicalMonitorCustomPresets_v1.1';
+
+// New: Cases data model (each case has id, name, presets[])
+let loadedCases = [];
+let nextCaseId = 0;
+const CASES_STORAGE_KEY = 'medicalMonitorCases_v1.0';
 const ADJUST_STEPS = { HR: 5, SPO2: 1, ABP_SYS: 5, ABP_DIA: 5, ETCO2_KPA: 0.1, ETCO2_MMHG: 1, RR: 1, TEMP_C: 0.1, TEMP_F: 0.2 };
 
 // Compute an auto-adjusted diastolic when systolic is driven below diastolic.
@@ -413,8 +418,19 @@ function _handleUpdateVitalsClick(monitorInstance) {
                 for (const k in currentActive) {
                     if (currentActive[k] && !monitorInstance.previousActiveAlarms?.[k]) newlyActive[k] = true;
                 }
-                updateAlarmVisuals();
-                try { triggerAlarmSounds(newlyActive); } catch (e) { /* ignore sound errors */ }
+                // Only update visuals/play sounds on an active monitor device
+                try {
+                    const role = getCurrentRole();
+                    if (role === 'monitor' && monitorInstance.animationRunning) {
+                        updateAlarmVisuals();
+                        try { triggerAlarmSounds(newlyActive); } catch (e) { /* ignore sound errors */ }
+                    } else {
+                        // Ensure sounds are not playing on non-monitor or inactive monitor
+                        try { /* call stop via imported manager indirectly by updateAlarmVisuals in script when stopping */ } catch(e){}
+                    }
+                } catch (e) {
+                    console.error('[_handleUpdateVitalsClick] Error while gating alarm visuals/sounds:', e);
+                }
                 monitorInstance.previousActiveAlarms = currentActive;
             }
         } catch (e) {
@@ -469,8 +485,15 @@ function _handleUpdateVitalsClick(monitorInstance) {
                     for (const k in currentActive) {
                         if (currentActive[k] && !monitorInstance.previousActiveAlarms?.[k]) newlyActive[k] = true;
                     }
-                    updateAlarmVisuals();
-                    try { triggerAlarmSounds(newlyActive); } catch (e) { /* ignore sound errors */ }
+                    try {
+                        const role = getCurrentRole();
+                        if (role === 'monitor' && monitorInstance.animationRunning) {
+                            updateAlarmVisuals();
+                            try { triggerAlarmSounds(newlyActive); } catch (e) { /* ignore sound errors */ }
+                        }
+                    } catch (e) {
+                        console.error('[applyFn] Error while gating alarm visuals/sounds:', e);
+                    }
                     monitorInstance.previousActiveAlarms = currentActive;
                 }
             } catch (e) {
@@ -504,6 +527,109 @@ function _handleColorChange(colorKey, event, monitorInstance) {
 
 function _applyPreset(presetKey, monitorInstance) { const presetData = PRESETS[presetKey]; if (!presetData) { console.error(`[Apply Preset] Preset not found: ${presetKey}`); return; } console.log(`[Apply Preset] Applying built-in preset: ${presetKey}`); _applyPresetParameters(presetData, monitorInstance); }
 function _applyCustomPreset(presetParams, monitorInstance) { if (!presetParams) { console.error(`[Apply Custom Preset] Invalid preset parameters provided.`); return; } console.log(`[Apply Custom Preset] Applying custom preset parameters.`); _applyPresetParameters(presetParams, monitorInstance); }
+
+function _getSelectedCaseId() {
+    const sel = document.getElementById('case-select');
+    if (sel && sel.value) return sel.value;
+    return null;
+}
+
+function _saveCasesToStorage() {
+    try {
+        localStorage.setItem(CASES_STORAGE_KEY, JSON.stringify(loadedCases));
+        console.log('[_saveCasesToStorage] Cases saved to localStorage.');
+    } catch (error) {
+        console.error('[_saveCasesToStorage] Error saving cases to localStorage:', error);
+        alert('Warning: Could not save cases to browser storage. They will be lost on page reload.');
+    }
+}
+
+function _updateCaseUIState(monitorInstance) {
+    const hasCase = Array.isArray(loadedCases) && loadedCases.length > 0 && loadedCases.some(c => !!c.id && c.presets);
+    const savePresetBtn = document.getElementById('save-custom-preset-button');
+    const uploadPresetBtn = document.getElementById('upload-custom-preset-button');
+    const presetFileInput = document.getElementById('preset-file-input');
+    const saveCaseBtn = document.getElementById('save-case-button');
+    const deleteCaseBtn = document.getElementById('delete-case-button');
+    if (savePresetBtn) savePresetBtn.disabled = !hasCase;
+    if (uploadPresetBtn) uploadPresetBtn.disabled = !hasCase;
+    if (presetFileInput) presetFileInput.disabled = !hasCase;
+    if (saveCaseBtn) saveCaseBtn.disabled = !hasCase;
+    if (deleteCaseBtn) deleteCaseBtn.disabled = !hasCase;
+}
+
+function _renderPresetsForSelectedCase(monitorInstance) {
+    const container = document.getElementById('custom-preset-buttons-container');
+    const noLabel = document.getElementById('no-custom-presets-label');
+    if (!container) return;
+    container.innerHTML = '';
+    const caseId = _getSelectedCaseId();
+    const targetCase = loadedCases.find(c => c.id === caseId);
+    if (!targetCase || !targetCase.presets || targetCase.presets.length === 0) {
+        if (noLabel) noLabel.classList.remove('d-none');
+        return;
+    }
+    if (noLabel) noLabel.classList.add('d-none');
+    for (const p of targetCase.presets) {
+        _addPresetButtonForCase(targetCase.id, p, monitorInstance);
+    }
+}
+
+function _addPresetButtonForCase(caseId, presetObj, monitorInstance) {
+    const container = document.getElementById('custom-preset-buttons-container');
+    if (!container) { console.error("[_addPresetButtonForCase] Custom preset button container not found."); return; }
+    const wrapper = document.createElement('div');
+    wrapper.classList.add('preset-item', 'd-inline-flex', 'align-items-center', 'mb-2', 'me-2');
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.classList.add('btn', 'btn-info', 'btn-sm');
+    button.textContent = presetObj.name || 'Unnamed Preset';
+    button.dataset.presetId = presetObj.id;
+    button.dataset.caseId = caseId;
+    button.style.marginRight = '6px';
+    button.addEventListener('click', () => {
+        console.log(`[Custom Preset Button] Clicked: ${presetObj.name} (ID: ${presetObj.id}) in case ${caseId}`);
+        const targetCase = loadedCases.find(c => c.id === caseId);
+        if (targetCase) {
+            const presetToApply = targetCase.presets.find(p => p.id === presetObj.id);
+            if (presetToApply) {
+                _applyCustomPreset(presetToApply.params, monitorInstance);
+                return;
+            }
+        }
+        console.error(`[_addPresetButtonForCase] Could not find preset ${presetObj.id} in case ${caseId}`);
+        alert('Error: Preset data not found.');
+    });
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.classList.add('btn', 'btn-outline-danger', 'btn-sm', 'preset-delete-btn');
+    delBtn.title = 'Delete preset';
+    delBtn.innerHTML = '<i class="fas fa-trash"></i>';
+    delBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        _deletePresetFromCase(caseId, presetObj.id, monitorInstance);
+    });
+
+    wrapper.appendChild(button);
+    wrapper.appendChild(delBtn);
+    container.appendChild(wrapper);
+    console.log(`[_addPresetButtonForCase] Added button for preset: ${presetObj.name} (ID: ${presetObj.id})`);
+}
+
+function _deletePresetFromCase(caseId, presetId, monitorInstance) {
+    const targetCase = loadedCases.find(c => c.id === caseId);
+    if (!targetCase) { alert('Case not found.'); return; }
+    const idx = targetCase.presets.findIndex(p => p.id === presetId);
+    if (idx === -1) { alert('Preset not found.'); return; }
+    const presetName = targetCase.presets[idx].name || presetId;
+    if (!confirm(`Delete preset '${presetName}' from case '${targetCase.name}'?`)) return;
+    targetCase.presets.splice(idx, 1);
+    _saveCasesToStorage();
+    _renderPresetsForSelectedCase(monitorInstance);
+    alert(`Preset '${presetName}' deleted.`);
+}
 
 function _applyPresetParameters(presetParamsToApply, monitorInstance) {
     const currentTargetColors = monitorInstance.targetParams?.colors
@@ -600,9 +726,45 @@ function _handleSavePreset(monitorInstance) {
         else if (key === 'nibp') { paramsToSave.nibp = { visible: sourceParams.nibp.visible }; }
         else if (key !== 'params' && sourceParams[key] && typeof sourceParams[key] === 'object') { paramsToSave[key] = JSON.parse(JSON.stringify(sourceParams[key])); }
     }
-    const presetFileContent = { presetName: presetName, formatVersion: "1.1", params: paramsToSave };
-    try { const jsonString = JSON.stringify(presetFileContent, null, 2); const blob = new Blob([jsonString], { type: 'application/json' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; const safeFileName = presetName.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.json'; link.download = safeFileName; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url); console.log(`[_handleSavePreset] Preset '${presetName}' saved as '${safeFileName}'.`); }
-    catch (error) { console.error("[_handleSavePreset] Error creating or saving file:", error); alert("Error saving preset to file."); }
+
+    // Save into currently selected case and persist to cache
+    let caseId = _getSelectedCaseId();
+    if (!caseId) {
+        alert('Please create or select a case before saving a preset. Use "New Case".');
+        return;
+    }
+    let targetCase = loadedCases.find(c => c.id === caseId);
+    if (!targetCase) {
+        alert('Selected case not found. Please recreate or select a different case.');
+        return;
+    }
+    const presetObj = { id: `preset-${nextCustomPresetId++}`, name: presetName, params: paramsToSave };
+    targetCase.presets.push(presetObj);
+    _addPresetButtonForCase(targetCase.id, presetObj, monitorInstance);
+    _saveCasesToStorage();
+    alert(`Preset '${presetName}' saved to case '${targetCase.name}' (cached).`);
+
+    // Optionally allow user to download file as well
+    if (confirm('Also download this preset as a .json file to your device?')) {
+        const presetFileContent = { presetName: presetName, formatVersion: "1.1", params: paramsToSave };
+        try {
+            const jsonString = JSON.stringify(presetFileContent, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            const safeFileName = presetName.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.json';
+            link.download = safeFileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            console.log(`[_handleSavePreset] Preset '${presetName}' downloaded as '${safeFileName}'.`);
+        } catch (error) {
+            console.error("[_handleSavePreset] Error creating or saving file:", error);
+            alert("Error saving preset to file.");
+        }
+    }
 }
 function _handleUploadClick() { const fileInput = document.getElementById('preset-file-input'); if (fileInput) { fileInput.click(); } else { console.error("[_handleUploadClick] File input element not found."); } }
 
@@ -644,13 +806,23 @@ function _handleLoadPresetFile(event, monitorInstance) {
             }
             finally {
                 if (loadedCount + errorCount === files.length) {
-                    loadedCustomPresets.push(...allLoadedPresetsFromFile);
+                    // Attach loaded presets to the currently selected case
+                    let caseId = _getSelectedCaseId();
+                    let targetCase = loadedCases.find(c => c.id === caseId);
+                    if (!targetCase) {
+                        alert('No case selected. Create or select a case before loading presets.');
+                        if(event.target) event.target.value = null;
+                        return;
+                    }
+
                     allLoadedPresetsFromFile.forEach(preset => {
-                        _addCustomPresetButton(preset.id, preset.name, monitorInstance);
+                        const presetObj = { id: `preset-${nextCustomPresetId++}`, name: preset.name, params: preset.params };
+                        targetCase.presets.push(presetObj);
+                        _addPresetButtonForCase(targetCase.id, presetObj, monitorInstance);
                     });
 
                     if (allLoadedPresetsFromFile.length > 0) {
-                        _saveCustomPresetsToStorage();
+                        _saveCasesToStorage();
                     }
 
                     if (loadedCount > 0) {
@@ -666,12 +838,21 @@ function _handleLoadPresetFile(event, monitorInstance) {
             console.error(`[_handleLoadPresetFile] Error reading file '${file.name}':`, e);
             alert(`Error reading file '${file.name}'.`); errorCount++;
             if (loadedCount + errorCount === files.length) {
-                loadedCustomPresets.push(...allLoadedPresetsFromFile);
+                // attach any successfully parsed presets
+                let caseId = _getSelectedCaseId();
+                let targetCase = loadedCases.find(c => c.id === caseId);
+                if (!targetCase) {
+                    alert('No case selected. Create or select a case before loading presets.');
+                    if(event.target) event.target.value = null;
+                    return;
+                }
                 allLoadedPresetsFromFile.forEach(preset => {
-                    _addCustomPresetButton(preset.id, preset.name, monitorInstance);
+                    const presetObj = { id: `preset-${nextCustomPresetId++}`, name: preset.name, params: preset.params };
+                    targetCase.presets.push(presetObj);
+                    _addPresetButtonForCase(targetCase.id, presetObj, monitorInstance);
                 });
                 if (allLoadedPresetsFromFile.length > 0) {
-                    _saveCustomPresetsToStorage();
+                    _saveCasesToStorage();
                 }
 
                 if (loadedCount > 0) { alert(`${loadedCount} preset(s) loaded successfully! ${errorCount > 0 ? errorCount + ' file(s) failed.' : ''}`); }
@@ -683,85 +864,103 @@ function _handleLoadPresetFile(event, monitorInstance) {
     }
 }
 
-function _addCustomPresetButton(presetId, presetName, monitorInstance) {
-    const container = document.getElementById('custom-preset-buttons-container');
-    const noPresetsLabel = document.getElementById('no-custom-presets-label');
-    if (!container) { console.error("[_addCustomPresetButton] Custom preset button container not found."); return; }
-    if (noPresetsLabel && !noPresetsLabel.classList.contains('d-none')) {
-        noPresetsLabel.classList.add('d-none');
-    }
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.classList.add('btn', 'btn-info', 'btn-sm', 'mb-2', 'me-2');
-    button.textContent = presetName;
-    button.dataset.presetId = presetId;
-    button.addEventListener('click', () => {
-        console.log(`[Custom Preset Button] Clicked: ${presetName} (ID: ${presetId})`);
-        const presetToApply = loadedCustomPresets.find(p => p.id === presetId);
-        if (presetToApply) {
-            _applyCustomPreset(presetToApply.params, monitorInstance);
-        } else {
-            console.error(`[_addCustomPresetButton] Could not find custom preset data for ID: ${presetId}`);
-            alert("Error: Preset data not found.");
-        }
-    });
-    container.appendChild(button);
-    console.log(`[_addCustomPresetButton] Added button for preset: ${presetName} (ID: ${presetId})`);
-}
-
+// Backwards-compat wrapper (kept for legacy callers)
 function _saveCustomPresetsToStorage() {
-    try {
-        localStorage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(loadedCustomPresets));
-        console.log('[_saveCustomPresetsToStorage] Custom presets saved to localStorage.');
-    } catch (error) {
-        console.error('[_saveCustomPresetsToStorage] Error saving custom presets to localStorage:', error);
-        alert('Warning: Could not save custom presets to browser storage. They will be lost on page reload.');
-    }
+    _saveCasesToStorage();
 }
 
-function _loadCustomPresetsFromStorage(monitorInstance) {
+function _loadCasesFromStorage(monitorInstance) {
     try {
-        const storedPresetsString = localStorage.getItem(CUSTOM_PRESETS_STORAGE_KEY);
-        if (storedPresetsString) {
-            const storedPresets = JSON.parse(storedPresetsString);
-            if (Array.isArray(storedPresets)) {
-                const existingNames = new Set(loadedCustomPresets.map(p => p.name));
-                const newPresetsFromStorage = storedPresets.filter(p => !existingNames.has(p.name));
-
-                loadedCustomPresets.push(...newPresetsFromStorage);
-                console.log('[_loadCustomPresetsFromStorage] Loaded custom presets from localStorage:', newPresetsFromStorage);
-
-                let maxId = -1;
-                loadedCustomPresets.forEach(preset => {
-                    if (!document.querySelector(`button[data-preset-id="${preset.id}"]`)) {
-                        _addCustomPresetButton(preset.id, preset.name, monitorInstance);
-                    }
-                    if (preset.id && typeof preset.id === 'string' && preset.id.startsWith('custom-')) {
-                        const idNum = parseInt(preset.id.replace('custom-', ''), 10);
-                        if (!isNaN(idNum) && idNum > maxId) {
-                            maxId = idNum;
-                        }
+        const stored = localStorage.getItem(CASES_STORAGE_KEY);
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed)) {
+                loadedCases = parsed;
+                // compute nextCaseId
+                let maxCase = -1;
+                loadedCases.forEach(c => {
+                    if (c.id && typeof c.id === 'string' && c.id.startsWith('case-')) {
+                        const n = parseInt(c.id.replace('case-', ''), 10);
+                        if (!isNaN(n) && n > maxCase) maxCase = n;
                     }
                 });
-                nextCustomPresetId = maxId + 1;
-                if (loadedCustomPresets.length > 0) {
-                     const noPresetsLabel = document.getElementById('no-custom-presets-label');
-                     if (noPresetsLabel) noPresetsLabel.classList.add('d-none');
-                }
-            } else {
-                console.warn('[_loadCustomPresetsFromStorage] Invalid data format in localStorage for presets.');
-                localStorage.removeItem(CUSTOM_PRESETS_STORAGE_KEY);
+                nextCaseId = maxCase + 1;
             }
         } else {
-            console.log('[_loadCustomPresetsFromStorage] No custom presets found in localStorage.');
+            // Try migrating old flat presets storage into a default case
+            const old = localStorage.getItem(CUSTOM_PRESETS_STORAGE_KEY);
+            if (old) {
+                try {
+                    const oldArr = JSON.parse(old);
+                    if (Array.isArray(oldArr) && oldArr.length > 0) {
+                        const defaultCase = { id: `case-${nextCaseId++}`, name: 'Default Case', presets: [] };
+                        oldArr.forEach(p => {
+                            defaultCase.presets.push({ id: `preset-${nextCustomPresetId++}`, name: p.name || p.presetName || 'Imported Preset', params: p.params || p });
+                        });
+                        loadedCases.push(defaultCase);
+                        _saveCasesToStorage();
+                        try { localStorage.removeItem(CUSTOM_PRESETS_STORAGE_KEY); } catch (e) { /* ignore */ }
+                    }
+                } catch (e) { console.warn('[_loadCasesFromStorage] Failed to migrate old presets:', e); }
+            }
         }
+
+        // Ensure at least one case exists
+        // If no cases exist, prompt user to create one (do not auto-create)
+        const sel = document.getElementById('case-select');
+        if (sel) {
+            sel.innerHTML = '';
+            if (loadedCases.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = '-- Create a case first --';
+                sel.appendChild(opt);
+            } else {
+                loadedCases.forEach(c => {
+                    const opt = document.createElement('option'); opt.value = c.id; opt.textContent = c.name; sel.appendChild(opt);
+                });
+                sel.value = loadedCases[0].id;
+            }
+        }
+
+        _renderPresetsForSelectedCase(monitorInstance);
+        _updateCaseUIState(monitorInstance);
     } catch (error) {
-        console.error('[_loadCustomPresetsFromStorage] Error loading or parsing custom presets from localStorage:', error);
-        alert('Warning: Could not load custom presets from browser storage. Data might be corrupted.');
-        try {
-            localStorage.removeItem(CUSTOM_PRESETS_STORAGE_KEY);
-        } catch (e) { /* ignore */ }
+        console.error('[_loadCasesFromStorage] Error loading cases from storage:', error);
     }
+}
+
+function _handleNewCase(monitorInstance) {
+    const name = prompt('Enter case name:', 'New Case');
+    if (!name) return;
+    const id = `case-${nextCaseId++}`;
+    const newCase = { id, name, presets: [] };
+    loadedCases.push(newCase);
+    const sel = document.getElementById('case-select');
+    if (sel) {
+        const opt = document.createElement('option'); opt.value = newCase.id; opt.textContent = newCase.name; sel.appendChild(opt); sel.value = newCase.id;
+    }
+    _saveCasesToStorage();
+    _renderPresetsForSelectedCase(monitorInstance);
+}
+
+function _handleDeleteCase(monitorInstance) {
+    const sel = document.getElementById('case-select');
+    if (!sel) return;
+    const caseId = sel.value;
+    const idx = loadedCases.findIndex(c => c.id === caseId);
+    if (idx === -1) return;
+    if (!confirm('Delete this case and all its presets?')) return;
+    loadedCases.splice(idx, 1);
+    if (loadedCases.length === 0) {
+        loadedCases.push({ id: `case-${nextCaseId++}`, name: 'Default Case', presets: [] });
+    }
+    // rebuild select
+    sel.innerHTML = '';
+    loadedCases.forEach(c => { const opt = document.createElement('option'); opt.value = c.id; opt.textContent = c.name; sel.appendChild(opt); });
+    sel.value = loadedCases[0].id;
+    _saveCasesToStorage();
+    _renderPresetsForSelectedCase(monitorInstance);
 }
 
 
@@ -820,6 +1019,15 @@ export function bindControlEvents(monitorInstance) {
     _addListener("save-custom-preset-button", "click", () => _handleSavePreset(monitorInstance));
     _addListener("upload-custom-preset-button", "click", _handleUploadClick);
     _addListener("preset-file-input", "change", (e) => _handleLoadPresetFile(e, monitorInstance));
+    _addListener('case-select', 'change', (e) => {
+        _renderPresetsForSelectedCase(monitorInstance);
+        _updateCaseUIState(monitorInstance);
+    });
+    _addListener('new-case-button', 'click', () => _handleNewCase(monitorInstance));
+    _addListener('delete-case-button', 'click', () => _handleDeleteCase(monitorInstance));
+    _addListener('save-case-button', 'click', () => _handleSaveCase(monitorInstance));
+    _addListener('upload-case-button', 'click', _handleCaseUploadClick);
+    _addListener('case-file-input', 'change', (e) => _handleLoadCaseFile(e, monitorInstance));
     _addListener("fullscreen-button", "click", _handleFullscreenToggle);
     document.addEventListener('fullscreenchange', _updateFullscreenState);
     document.addEventListener('webkitfullscreenchange', _updateFullscreenState);
@@ -881,10 +1089,90 @@ export function bindControlEvents(monitorInstance) {
         }
     });
 
-    _loadCustomPresetsFromStorage(monitorInstance);
+    _loadCasesFromStorage(monitorInstance);
 
     console.log("[bindControlEvents] All event listeners attached.");
     monitorInstance.showPendingChanges();
+}
+
+function _handleCaseUploadClick() { const fileInput = document.getElementById('case-file-input'); if (fileInput) { fileInput.click(); } else { console.error('[_handleCaseUploadClick] case-file-input not found'); } }
+
+function _handleSaveCase(monitorInstance) {
+    const sel = document.getElementById('case-select');
+    if (!sel) { alert('No case selector found.'); return; }
+    const caseId = sel.value;
+    const targetCase = loadedCases.find(c => c.id === caseId);
+    if (!targetCase) { alert('Selected case not found.'); return; }
+    try {
+        const out = JSON.parse(JSON.stringify(targetCase));
+        // remove runtime-only IDs to make file portable
+        out.id = undefined;
+        const json = JSON.stringify({ caseName: targetCase.name, formatVersion: '1.0', case: targetCase }, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a'); link.href = url; const safeFileName = (targetCase.name || 'case').replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.json'; link.download = safeFileName; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url);
+        console.log(`[_handleSaveCase] Case '${targetCase.name}' exported.`);
+        alert(`Case '${targetCase.name}' saved to file.`);
+    } catch (e) { console.error('[_handleSaveCase] Error exporting case:', e); alert('Error exporting case.'); }
+}
+
+function _handleLoadCaseFile(event, monitorInstance) {
+    const files = event.target.files; if (!files || files.length === 0) { console.log('[_handleLoadCaseFile] No files selected.'); return; }
+    const file = files[0]; const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const parsed = JSON.parse(e.target.result);
+            const payload = parsed.case || parsed;
+            const name = parsed.caseName || payload.name || payload.caseName || ('Imported Case ' + Date.now());
+            if (!payload || !Array.isArray(payload.presets)) {
+                throw new Error('Invalid case file format (missing presets array).');
+            }
+            // Validate presets minimally
+            for (const p of payload.presets) {
+                if (!p.name || !p.params || !p.params.ecg || !p.params.ecg.rhythm || !RHYTHM_PARAMS[p.params.ecg.rhythm]) {
+                    throw new Error('Invalid preset structure or unknown ECG rhythm in one of the presets.');
+                }
+            }
+
+            // If case with same name exists, ask to overwrite or keep both
+            const existing = loadedCases.find(c => c.name === name);
+            if (existing) {
+                if (!confirm(`Case named '${name}' already exists. Overwrite existing case? (Cancel to import as new)`)) {
+                    // Import as new, give a new unique name
+                    let i = 1; let newName = name + ' (' + i + ')';
+                    while (loadedCases.find(c => c.name === newName)) { i++; newName = name + ' (' + i + ')'; }
+                    const newCase = { id: `case-${nextCaseId++}`, name: newName, presets: [] };
+                    payload.presets.forEach(p => newCase.presets.push({ id: `preset-${nextCustomPresetId++}`, name: p.name, params: p.params }));
+                    loadedCases.push(newCase);
+                    const sel = document.getElementById('case-select'); if (sel) { const opt = document.createElement('option'); opt.value = newCase.id; opt.textContent = newCase.name; sel.appendChild(opt); sel.value = newCase.id; }
+                    _saveCasesToStorage(); _renderPresetsForSelectedCase(monitorInstance);
+                    alert('Case imported as: ' + newName);
+                } else {
+                    // Overwrite
+                    existing.presets = [];
+                    payload.presets.forEach(p => existing.presets.push({ id: `preset-${nextCustomPresetId++}`, name: p.name, params: p.params }));
+                    _saveCasesToStorage();
+                    const sel = document.getElementById('case-select'); if (sel) sel.value = existing.id;
+                    _renderPresetsForSelectedCase(monitorInstance);
+                    alert('Case overwritten: ' + existing.name);
+                }
+            } else {
+                const newCase = { id: `case-${nextCaseId++}`, name: name, presets: [] };
+                payload.presets.forEach(p => newCase.presets.push({ id: `preset-${nextCustomPresetId++}`, name: p.name, params: p.params }));
+                loadedCases.push(newCase);
+                const sel = document.getElementById('case-select'); if (sel) { const opt = document.createElement('option'); opt.value = newCase.id; opt.textContent = newCase.name; sel.appendChild(opt); sel.value = newCase.id; }
+                _saveCasesToStorage(); _renderPresetsForSelectedCase(monitorInstance);
+                alert('Case imported: ' + newCase.name);
+            }
+        } catch (err) {
+            console.error('[_handleLoadCaseFile] Error parsing or validating case file:', err);
+            alert('Error loading case file: ' + err.message);
+        } finally {
+            if (event.target) event.target.value = null;
+        }
+    };
+    reader.onerror = (e) => { console.error('[_handleLoadCaseFile] File read error', e); alert('Error reading file.'); if (event.target) event.target.value = null; };
+    reader.readAsText(file);
 }
 
 export function updateControlsToReflectParams(monitorInstance) {

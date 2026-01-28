@@ -183,18 +183,28 @@
                     </div>
                     <hr class="border-secondary"/>
                     <h5 class="text-info mt-3 mb-2">Custom Presets</h5>
-                    <div class="d-grid gap-2 d-md-flex flex-wrap justify-content-center mb-3">
-                        <button id="save-custom-preset-button" type="button" class="btn btn-outline-primary btn-sm mb-2">
-                            <i class="fas fa-save me-1"></i> Save Current as Preset
-                        </button>
-                        <button id="upload-custom-preset-button" type="button" class="btn btn-outline-info btn-sm mb-2">
-                            <i class="fas fa-upload me-1"></i> Upload Preset File(s)
-                        </button>
-                        <input type="file" id="preset-file-input" accept=".json" class="visually-hidden-focusable" multiple/>
-                    </div>
-                    <div id="custom-preset-buttons-container" class="d-grid gap-2 d-md-flex flex-wrap justify-content-center">
-                        <p id="no-custom-presets-label" class="small mb-0">No custom presets loaded.</p>
-                    </div>
+                  <div class="d-grid gap-2 d-md-flex flex-wrap justify-content-center mb-3">
+                     <button id="save-custom-preset-button" type="button" class="btn btn-outline-primary btn-sm mb-2">
+                        <i class="fas fa-save me-1"></i> Save Current as Preset
+                     </button>
+                     <button id="upload-custom-preset-button" type="button" class="btn btn-outline-info btn-sm mb-2">
+                        <i class="fas fa-upload me-1"></i> Upload Preset File(s)
+                     </button>
+                     <input type="file" id="preset-file-input" accept=".json" class="visually-hidden-focusable" multiple/>
+                  </div>
+
+                  <div class="d-flex justify-content-center gap-2 mb-2">
+                     <select id="case-select" class="form-select form-select-sm w-auto"></select>
+                     <button id="new-case-button" class="btn btn-success btn-sm">New Case</button>
+                     <button id="delete-case-button" class="btn btn-outline-danger btn-sm">Delete Case</button>
+                     <button id="save-case-button" class="btn btn-outline-primary btn-sm">Save Case</button>
+                     <button id="upload-case-button" class="btn btn-outline-info btn-sm">Upload Case</button>
+                     <input type="file" id="case-file-input" accept=".json" class="visually-hidden-focusable" />
+                  </div>
+
+                  <div id="custom-preset-buttons-container" class="d-grid gap-2 d-md-flex flex-wrap justify-content-center">
+                     <p id="no-custom-presets-label" class="small mb-0">No custom presets loaded.</p>
+                  </div>
                     </div>
               </div>
           </div>
