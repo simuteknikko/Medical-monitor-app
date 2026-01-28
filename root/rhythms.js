@@ -357,8 +357,10 @@ export const RHYTHM_PARAMS = {
     s_amp_factor: 0.15,
     t_amp: 0.28,
     t_width: 0.07,
-    pr_interval: 0.24,
-    t_mean_offset: 0.25 + (0.24 - 0.16),
+      pr_interval: 0.40, // prolonged PR (>200 ms) per request
+      p_duration: 0.10, // fixed P-wave duration so P shape remains natural
+      // Keep T offset relative to QRS constant; don't add extra PR-dependent shift
+      t_mean_offset: 0.25,
     noise_amp: 0.015,
   },
   avb2m1: {
@@ -372,7 +374,7 @@ export const RHYTHM_PARAMS = {
     hasT: true,
     isPEA: false,
     isArtifact: false,
-    irregular: 0.05,
+    irregular: 0.03, // slight variability
     p_amp: 0.15,
     qrs_amp: 1.2,
     qrs_width: 0.08,
@@ -380,12 +382,40 @@ export const RHYTHM_PARAMS = {
     s_amp_factor: 0.15,
     t_amp: 0.25,
     t_width: 0.07,
-    prIntervalStart: 0.16,
-    prIncrement: 0.06,
-    wenckebachRatioBeats: 4,
+    // Wenckebach: progressive PR prolongation then a dropped beat
+    prIntervalStart: 0.17, // start slightly prolonged
+    prIncrement: 0.03, // smaller progressive prolongation per beat
+    wenckebachRatioBeats: 3, // typically 3:1 type cycles are common
+    conductionProbability: 1.0, // conduction occurs until the dropped beat
     noise_amp: 0.02,
   },
   avb2m2: {
+    generatorType: "avBlock",
+    blockType: "mobitz2",
+    baseHR: 40,
+    atrialRate: 80,
+    isFlat: false,
+    isChaotic: false,
+    hasP: true,
+    hasT: true,
+    isPEA: false,
+    isArtifact: false,
+    irregular: 0.02, // keep PR intervals consistent
+    p_amp: 0.15,
+    qrs_amp: 1.2,
+    qrs_width: 0.14,
+    q_amp_factor: 0.1,
+    s_amp_factor: 0.15,
+    t_amp: 0.2,
+    t_width: 0.08,
+    // Mobitz II: constant PR interval with intermittent non-conducted P-waves
+    prIntervalFixed: 0.18,
+    conductionProbability: 0.6, // occasional failures of conduction
+    escapeEnabled: true,
+    escapeRate: 40,
+    noise_amp: 0.02,
+  },
+  avb3: {
     generatorType: "avBlock",
     blockType: "mobitz2",
     baseHR: 40,
@@ -409,28 +439,6 @@ export const RHYTHM_PARAMS = {
     escapeEnabled: true,
     escapeRate: 40,
     noise_amp: 0.02,
-  },
-  avb3: {
-    generatorType: "avBlock",
-    blockType: "avb3",
-    baseHR: 35,
-    atrialRate: 75,
-    isFlat: false,
-    isChaotic: false,
-    hasP: true,
-    hasT: true,
-    isPEA: false,
-    isArtifact: false,
-    irregular: 0.02,
-    p_amp: 0.16,
-    qrs_amp: 1.3,
-    qrs_width: 0.16,
-    q_amp_factor: 0.1,
-    s_amp_factor: 0.15,
-    t_amp: -0.25,
-    t_width: 0.1,
-    prIntervalFixed: 0,
-    noise_amp: 0.025,
   },
 
   // --- Injury / Ischemia Patterns ---
