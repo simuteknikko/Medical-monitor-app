@@ -40,7 +40,7 @@
                     <h3 class="text-light mb-3">Join Session</h3>
                     <input type="text" id="landing-join-id" class="form-control form-control-lg text-center mb-3 text-uppercase" placeholder="Enter Session ID">
                     <button id="btn-landing-join-action" class="btn btn-success w-100 py-3 mb-2">Join</button>
-                    <button id="btn-join-back" class="btn btn-link text-muted">Back</button>
+                    <button id="btn-join-back" class="btn btn-outline-light w-100 mt-2">&larr; Back to Home</button>
                 </div>
 
                 <div id="landing-lobby" class="d-none">
@@ -63,6 +63,11 @@
                             </button>
                         </div>
                     </div>
+                  <div class="row mt-3">
+                     <div class="col-6 offset-3 text-center">
+                        <button id="btn-lobby-back" class="btn btn-light btn-lg w-100" aria-label="Back to Home"><i class="fas fa-home me-2"></i>Back to Home</button>
+                     </div>
+                  </div>
                 </div>
             </div>
         </div>
@@ -672,10 +677,11 @@
                     <label for="session-id-input" class="form-label small">Session ID:</label>
                     <input type="text" class="form-control form-control-sm" id="session-id-input" placeholder="Enter ID to join or create new" aria-label="Session ID">
                 </div>
-                <div class="col-md-4 mb-2 mb-md-0 text-center">
-                     <button class="btn btn-sm btn-success me-2" id="create-session-btn">Create Session</button>
-                     <button class="btn btn-sm btn-primary" id="join-session-btn">Join Session</button>
-                </div>
+               <div class="col-md-4 mb-2 mb-md-0 text-center">
+                  <button class="btn btn-success w-100 mb-2" id="create-session-btn">Create Session</button>
+                  <button class="btn btn-primary w-100 mb-2" id="join-session-btn">Join Session</button>
+                  <button id="session-back-home-btn" class="btn btn-light w-100" aria-label="Back to Home">&larr; Back to Home</button>
+               </div>
                  <div class="col-md-4 text-center text-md-start">
                      <span id="connection-status-label" class="badge bg-secondary">Disconnected</span>
                  </div>

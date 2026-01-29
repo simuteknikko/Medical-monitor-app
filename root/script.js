@@ -124,6 +124,7 @@ import {
   sendShockCommand,
   sendNibpTrigger,
 } from "./networkManager.js";
+import { leaveSession } from "./networkManager.js";
 
 // --- Constants and Registries ---
 const SHOCK_ARTIFACT_AMPLITUDE = 4.0;
@@ -335,8 +336,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const btnJoinBack = document.getElementById('btn-join-back');
         if (btnJoinBack) btnJoinBack.onclick = () => {
-            document.getElementById('landing-join').classList.add('d-none');
-            document.getElementById('landing-menu').classList.remove('d-none');
+          // Delegate leaving/navigation to network manager which shows confirm dialog
+          try { leaveSession(); } catch (e) { console.warn('Could not call leaveSession from Join back button:', e); }
         };
 
         const btnRoleCtrl = document.getElementById('btn-role-controller');
@@ -344,6 +345,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const btnRoleMon = document.getElementById('btn-role-monitor');
         if (btnRoleMon) btnRoleMon.onclick = () => enterApp('monitor');
+
+        const btnLobbyBack = document.getElementById('btn-lobby-back');
+        if (btnLobbyBack) btnLobbyBack.onclick = () => {
+          try { leaveSession(); } catch (e) { console.warn('Could not call leaveSession from Lobby back button:', e); }
+        };
+
+        // Session controls: Back to Home button inside the running app session controls
+        const sessionBackBtn = document.getElementById('session-back-home-btn');
+        if (sessionBackBtn) sessionBackBtn.onclick = () => {
+          try { leaveSession(); } catch (e) { console.warn('Could not call leaveSession from session controls:', e); }
+        };
     }
     // --- END NEW METHOD ---
     

@@ -599,3 +599,37 @@ function handleCopyLink() {
 export function getCurrentRole() {
     return currentRole;
 }
+
+export function leaveSession() {
+    console.log('[Network] leaveSession called by UI.');
+    // Ask user for confirmation before leaving session
+    try {
+        if (!confirm('Are you sure you want to leave the session and return to Home?')) return;
+    } catch (e) {
+        // If confirm is unavailable, proceed
+    }
+
+    // Do not send a 'leave_session' message - server does not recognize it.
+    // Perform local cleanup and UI update instead.
+    currentSessionId = null;
+    if (sessionIdInput) sessionIdInput.value = '';
+    updateConnectionStatus('Disconnected', 'bg-danger');
+    hideSessionShareArea();
+    updateUIForRole(currentRole);
+
+    // Navigate UI back to landing view if present
+    try {
+        const landingView = document.getElementById('landing-view');
+        const appView = document.getElementById('app-view');
+        if (landingView && appView) {
+            appView.style.display = 'none';
+            landingView.style.display = 'block';
+            const landingMenu = document.getElementById('landing-menu');
+            const landingJoin = document.getElementById('landing-join');
+            const landingLobby = document.getElementById('landing-lobby');
+            if (landingMenu) landingMenu.classList.remove('d-none');
+            if (landingJoin) landingJoin.classList.add('d-none');
+            if (landingLobby) landingLobby.classList.add('d-none');
+        }
+    } catch (e) { console.warn('[Network] leaveSession UI navigation failed:', e); }
+}
