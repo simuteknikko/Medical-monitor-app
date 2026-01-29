@@ -123,8 +123,12 @@ import {
   getCurrentRole,
   sendShockCommand,
   sendNibpTrigger,
+  requestSessionList,
+  leaveSession,
+  endSession,
+  joinSessionById,
+  endSessionById
 } from "./networkManager.js";
-import { leaveSession } from "./networkManager.js";
 
 // --- Constants and Registries ---
 const SHOCK_ARTIFACT_AMPLITUDE = 4.0;
@@ -249,13 +253,97 @@ document.addEventListener("DOMContentLoaded", () => {
                       text: `${window.location.origin}/?session=${sessionId}`,
                       width: 128, height: 128
                   });
+                  // Creator is owner -> show owner-only controls
+                  try {
+                    const ownerBtn = document.getElementById('owner-end-session-btn');
+                    const ownerBtnApp = document.getElementById('owner-end-session-btn-app');
+                    if (ownerBtn) ownerBtn.classList.remove('d-none');
+                    if (ownerBtnApp) ownerBtnApp.classList.remove('d-none');
+                  } catch (e) {}
               },
-              onSessionJoined: (sessionId) => {
+                  onSessionJoined: (sessionId, isAdmin) => {
                   document.getElementById('landing-menu').classList.add('d-none');
                   document.getElementById('landing-join').classList.add('d-none');
                   document.getElementById('landing-lobby').classList.remove('d-none');
                   document.getElementById('landing-session-id-display').textContent = sessionId;
+                    try {
+                      const ownerBtn = document.getElementById('owner-end-session-btn');
+                      const ownerBtnApp = document.getElementById('owner-end-session-btn-app');
+                      if (isAdmin) {
+                        if (ownerBtn) ownerBtn.classList.remove('d-none');
+                        if (ownerBtnApp) ownerBtnApp.classList.remove('d-none');
+                      } else {
+                        if (ownerBtn) ownerBtn.classList.add('d-none');
+                        if (ownerBtnApp) ownerBtnApp.classList.add('d-none');
+                      }
+                    } catch (e) {}
               }
+                ,
+                onSessionList: (sessions) => {
+                  try {
+                    const listContainer = document.getElementById('landing-sessions-list');
+                    if (!listContainer) return;
+                    listContainer.innerHTML = '';
+                    if (!sessions || sessions.length === 0) {
+                      const el = document.createElement('div');
+                      el.className = 'list-group-item bg-dark text-white';
+                      el.textContent = 'No active or persisted sessions found.';
+                      listContainer.appendChild(el);
+                      return;
+                    }
+                    sessions.forEach(s => {
+                      const item = document.createElement('div');
+                      item.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
+                      const left = document.createElement('div');
+                      left.innerHTML = `<strong class="text-warning me-2">${s.sessionId}</strong> <small class="text-muted">clients: ${s.clientCount}</small>`;
+                      const right = document.createElement('div');
+                      const joinBtn = document.createElement('button');
+                      joinBtn.className = 'btn btn-sm btn-primary';
+                      joinBtn.textContent = 'Join';
+                        joinBtn.onclick = () => {
+                          try {
+                            // Show the lobby (role choice) immediately for this session
+                            const menu = document.getElementById('landing-menu');
+                            const joinView = document.getElementById('landing-join');
+                            const lobbyView = document.getElementById('landing-lobby');
+                            if (menu) menu.classList.add('d-none');
+                            if (joinView) joinView.classList.add('d-none');
+                            const sessionsView = document.getElementById('landing-sessions');
+                            if (sessionsView) sessionsView.classList.add('d-none');
+                            if (lobbyView) lobbyView.classList.remove('d-none');
+                            // Update visible session id
+                            const display = document.getElementById('landing-session-id-display');
+                            if (display) display.textContent = s.sessionId;
+                            // Initiate join via network manager helper
+                            try { joinSessionById(s.sessionId); } catch (e) { console.warn('joinSessionById failed', e); }
+                          } catch (e) { console.warn('Failed to initiate join from sessions list', e); }
+                        };
+                        right.appendChild(joinBtn);
+
+                        // If this browser has the admin token for that session, show an End button
+                        try {
+                          const tokenKey = `medicalMonitorAdminToken_${s.sessionId}`;
+                          let hasToken = false;
+                          try { hasToken = !!localStorage.getItem(tokenKey); } catch (e) { hasToken = false; }
+                          if (hasToken) {
+                            const endBtn = document.createElement('button');
+                            endBtn.className = 'btn btn-sm btn-danger ms-2';
+                            endBtn.textContent = 'End';
+                            endBtn.onclick = () => {
+                              try {
+                                if (!confirm(`End session ${s.sessionId} for everyone?`)) return;
+                                endSessionById(s.sessionId);
+                              } catch (e) { console.warn('Failed to end session from list', e); }
+                            };
+                            right.appendChild(endBtn);
+                          }
+                        } catch (e) { console.warn('Could not determine owner token for session list item', e); }
+                      item.appendChild(left);
+                      item.appendChild(right);
+                      listContainer.appendChild(item);
+                    });
+                  } catch (e) { console.error('Error rendering session list', e); }
+                }
             },
             { 
               isMonitorActive: this.isMonitorActive.bind(this),
@@ -325,6 +413,28 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById('landing-join').classList.remove('d-none');
         };
 
+        const btnSessions = document.getElementById('btn-mode-sessions');
+        if (btnSessions) btnSessions.onclick = () => {
+          // Request current sessions from server and show view
+          try {
+            const listView = document.getElementById('landing-sessions');
+            const menu = document.getElementById('landing-menu');
+            const joinView = document.getElementById('landing-join');
+            const lobbyView = document.getElementById('landing-lobby');
+            const qrContainer = document.getElementById('landing-qr-container');
+            const sessionIdDisplay = document.getElementById('landing-session-id-display');
+            if (menu) menu.classList.add('d-none');
+            if (joinView) joinView.classList.add('d-none');
+            if (lobbyView) lobbyView.classList.add('d-none');
+            if (listView) listView.classList.remove('d-none');
+            if (qrContainer) qrContainer.innerHTML = '';
+            if (sessionIdDisplay) sessionIdDisplay.textContent = '--';
+            const listContainer = document.getElementById('landing-sessions-list');
+            if (listContainer) listContainer.innerHTML = '<div class="list-group-item bg-dark text-white">Loading...</div>';
+            requestSessionList();
+          } catch (e) { console.warn('Failed to request session list', e); }
+        };
+
         const btnJoinAction = document.getElementById('btn-landing-join-action');
         if (btnJoinAction) btnJoinAction.onclick = () => {
             const id = document.getElementById('landing-join-id').value;
@@ -336,8 +446,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const btnJoinBack = document.getElementById('btn-join-back');
         if (btnJoinBack) btnJoinBack.onclick = () => {
-          // Delegate leaving/navigation to network manager which shows confirm dialog
-          try { leaveSession(); } catch (e) { console.warn('Could not call leaveSession from Join back button:', e); }
+          try {
+            const sid = (document.getElementById('session-id-input') || {}).value || '';
+            const tokenKey = sid ? `medicalMonitorAdminToken_${sid}` : null;
+            const hasToken = tokenKey ? !!localStorage.getItem(tokenKey) : false;
+            if (hasToken) {
+                if (confirm('You are the session owner. End session for everyone? OK = End session, Cancel = Leave without ending.')) {
+                    endSession();
+                } else {
+                    leaveSession();
+                }
+            } else {
+                leaveSession();
+            }
+          } catch (e) { console.warn('Could not call leaveSession/endSession from Join back button:', e); }
         };
 
         const btnRoleCtrl = document.getElementById('btn-role-controller');
@@ -348,13 +470,57 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const btnLobbyBack = document.getElementById('btn-lobby-back');
         if (btnLobbyBack) btnLobbyBack.onclick = () => {
-          try { leaveSession(); } catch (e) { console.warn('Could not call leaveSession from Lobby back button:', e); }
+          try {
+            // Directly return to Home without confirmation; owner has explicit End button in lobby
+            leaveSession(true);
+          } catch (e) { console.warn('Could not call leaveSession from Lobby back button:', e); }
         };
 
         // Session controls: Back to Home button inside the running app session controls
         const sessionBackBtn = document.getElementById('session-back-home-btn');
         if (sessionBackBtn) sessionBackBtn.onclick = () => {
-          try { leaveSession(); } catch (e) { console.warn('Could not call leaveSession from session controls:', e); }
+          try {
+            const sid = (document.getElementById('session-id-input') || {}).value || '';
+            const tokenKey = sid ? `medicalMonitorAdminToken_${sid}` : null;
+            const hasToken = tokenKey ? !!localStorage.getItem(tokenKey) : false;
+            if (hasToken) {
+                if (confirm('You are the session owner. End session for everyone? OK = End session, Cancel = Leave without ending.')) {
+                    endSession();
+                } else {
+                    leaveSession();
+                }
+            } else {
+                leaveSession();
+            }
+          } catch (e) { console.warn('Could not call leaveSession/endSession from session controls:', e); }
+        };
+
+        // Owner End Session buttons (lobby and app)
+        const ownerEndBtn = document.getElementById('owner-end-session-btn');
+        if (ownerEndBtn) ownerEndBtn.onclick = () => {
+          try {
+            if (confirm('End session for everyone? This cannot be undone.')) {
+              endSession();
+            }
+          } catch (e) { console.warn('Failed to end session from owner button', e); }
+        };
+        const ownerEndBtnApp = document.getElementById('owner-end-session-btn-app');
+        if (ownerEndBtnApp) ownerEndBtnApp.onclick = () => {
+          try {
+            if (confirm('End session for everyone? This cannot be undone.')) {
+              endSession();
+            }
+          } catch (e) { console.warn('Failed to end session from owner app button', e); }
+        };
+
+        const btnSessionsBack = document.getElementById('btn-sessions-back');
+        if (btnSessionsBack) btnSessionsBack.onclick = () => {
+          try {
+            const listView = document.getElementById('landing-sessions');
+            const menu = document.getElementById('landing-menu');
+            if (listView) listView.classList.add('d-none');
+            if (menu) menu.classList.remove('d-none');
+          } catch (e) { console.warn('Failed to navigate back from sessions list', e); }
         };
     }
     // --- END NEW METHOD ---
