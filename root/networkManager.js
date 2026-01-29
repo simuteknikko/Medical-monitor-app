@@ -33,6 +33,7 @@ let sessionIdFromUrl = null;
 let isAttemptingAutoJoin = false;
 let onSessionCreatedCallback = null;
 let onSessionJoinedCallback = null;
+let onSessionListCallback = null;
 
 // --- DOM Elements ---
 let sessionIdInput, createSessionBtn, joinSessionBtn, connectionStatusLabel;
@@ -59,6 +60,7 @@ export function initializeNetwork(callbacks, mInterface) {
     onSoundStateReceivedCallback = callbacks.onSoundState;
     onSessionCreatedCallback = callbacks.onSessionCreated;
     onSessionJoinedCallback = callbacks.onSessionJoined;
+    onSessionListCallback = callbacks.onSessionList;
     monitorInterface = mInterface;
 
     sessionIdInput = document.getElementById('session-id-input');
@@ -241,6 +243,10 @@ function handleServerMessage(message) {
             currentSessionId = message.sessionId;
             if(sessionIdInput) sessionIdInput.value = currentSessionId;
             console.log(`[Network] Session created with ID: ${currentSessionId}`);
+            // Store admin token (if provided) for session owner recoverability
+            if (message.adminToken) {
+                try { localStorage.setItem(`medicalMonitorAdminToken_${currentSessionId}`, message.adminToken); console.log('[Network] Admin token saved to localStorage.'); } catch (e) { console.warn('[Network] Failed to save admin token:', e); }
+            }
             if (typeof onSessionCreatedCallback === 'function') {
                 onSessionCreatedCallback(currentSessionId);
             }
@@ -248,11 +254,50 @@ function handleServerMessage(message) {
             sendSetRole(currentRole);
             updateConnectionStatus(`Session: ${currentSessionId}`, 'bg-success');
             break;
+        case 'session_ended':
+            console.log('[Network] Session ended by server or owner.');
+            // Clean up local state and inform user
+            if (message && message.sessionId) {
+                // Remove any stored admin token for this session (it's ended)
+                try {
+                    const key = `medicalMonitorAdminToken_${message.sessionId}`;
+                    localStorage.removeItem(key);
+                } catch (e) { /* ignore */ }
+                // Refresh sessions list UI if present
+                try { requestSessionList(); } catch (e) { /* ignore */ }
+            }
+            if (message && message.sessionId === currentSessionId) {
+                currentSessionId = null;
+                if (sessionIdInput) sessionIdInput.value = '';
+                hideSessionShareArea();
+                updateConnectionStatus('Disconnected / Session Ended', 'bg-danger');
+                alert(message.reason || 'Session ended. Returning to home.');
+                try {
+                    const landingView = document.getElementById('landing-view');
+                    const appView = document.getElementById('app-view');
+                    const landingMenu = document.getElementById('landing-menu');
+                    const landingJoin = document.getElementById('landing-join');
+                    const landingLobby = document.getElementById('landing-lobby');
+                    if (landingView && appView) {
+                        appView.style.display = 'none';
+                        landingView.style.display = 'block';
+                    }
+                    if (landingMenu) landingMenu.classList.remove('d-none');
+                    if (landingJoin) landingJoin.classList.add('d-none');
+                    if (landingLobby) landingLobby.classList.add('d-none');
+                } catch(e){}
+            }
+            break;
         case 'session_joined':
             currentSessionId = message.sessionId;
             console.log(`[Network] Successfully joined session: ${currentSessionId}`);
-            if (typeof onSessionJoinedCallback === 'function') {
-                onSessionJoinedCallback(currentSessionId);
+                if (typeof onSessionJoinedCallback === 'function') {
+                    try { onSessionJoinedCallback(currentSessionId, !!message.admin); } catch(e) { onSessionJoinedCallback(currentSessionId); }
+                }
+            // If server confirmed admin, ensure admin token remains in storage (no-op if already present)
+            if (message.admin && currentSessionId) {
+                const key = `medicalMonitorAdminToken_${currentSessionId}`;
+                try { if (!localStorage.getItem(key)) localStorage.setItem(key, 'RETAINED'); } catch (e) {}
             }
             if (!isAttemptingAutoJoin && !reconnectTimerId) {
                  alert(`Joined session: ${currentSessionId}`);
@@ -334,6 +379,12 @@ function handleServerMessage(message) {
                 console.log('[Network] Ignoring sound_state_update as role is not Monitor or callback missing.');
             }
             break;
+        case 'session_list':
+            console.log('[Network] Received current session list from server.');
+            if (typeof onSessionListCallback === 'function') {
+                onSessionListCallback(message.sessions || []);
+            }
+            break;
         case 'error':
             console.error(`[Network] Server Error: ${message.message}`);
             if (message.details === 'session_does_not_exist' || message.message.includes("Session not found") || message.message.includes("Sessiota ei löytynyt")) { // Keep Finnish check for compatibility if server sends it
@@ -410,7 +461,65 @@ function handleJoinSession(sessionIdToJoinFromCall = null) {
         alert("Please enter a Session ID to join.");
         return;
     }
-    sendMessage({ type: 'join_session', sessionId: sessionIdToAttempt });
+    // If an admin token exists for this session (owner returning), include it so server can validate owner reclaim
+    const storedKey = `medicalMonitorAdminToken_${sessionIdToAttempt}`;
+    const storedToken = (() => { try { return localStorage.getItem(storedKey); } catch (e) { return null; } })();
+    const joinPayload = { type: 'join_session', sessionId: sessionIdToAttempt };
+    if (storedToken) joinPayload.adminToken = storedToken;
+    sendMessage(joinPayload);
+}
+
+/**
+ * Join a session by ID programmatically. Includes stored adminToken if present.
+ * @param {string} sessionIdToAttempt
+ */
+export function joinSessionById(sessionIdToAttempt) {
+    if (!sessionIdToAttempt || typeof sessionIdToAttempt !== 'string') {
+        console.warn('[Network] joinSessionById called with invalid sessionId:', sessionIdToAttempt);
+        alert('Please enter a Session ID to join.');
+        return;
+    }
+    sessionIdToAttempt = sessionIdToAttempt.trim().toUpperCase();
+    // Include admin token if available
+    const storedKey = `medicalMonitorAdminToken_${sessionIdToAttempt}`;
+    let storedToken = null;
+    try { storedToken = localStorage.getItem(storedKey); } catch (e) { storedToken = null; }
+    const joinPayload = { type: 'join_session', sessionId: sessionIdToAttempt };
+    if (storedToken) joinPayload.adminToken = storedToken;
+    sendMessage(joinPayload);
+}
+
+/**
+ * End a session by ID using a stored admin token for that session.
+ * @param {string} sessionId
+ * @returns {boolean} true if request sent, false otherwise
+ */
+export function endSessionById(sessionId) {
+    if (!sessionId) {
+        console.warn('[Network] endSessionById called without sessionId');
+        alert('No session specified to end.');
+        return false;
+    }
+    const key = `medicalMonitorAdminToken_${sessionId}`;
+    let token = null;
+    try { token = localStorage.getItem(key); } catch (e) { token = null; }
+    if (!token) {
+        alert('Admin token not found for this session. Only the owner can end it.');
+        return false;
+    }
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        alert('Not connected to server. Cannot end session remotely.');
+        return false;
+    }
+    try {
+        sendMessage({ type: 'end_session', sessionId: sessionId, adminToken: token });
+        console.log('[Network] Sent end_session request for session:', sessionId);
+        return true;
+    } catch (e) {
+        console.error('[Network] Failed to send end_session request:', e);
+        alert('Failed to send end session request.');
+        return false;
+    }
 }
 
 function sendSetRole(role) {
@@ -456,6 +565,16 @@ export function sendNibpTrigger(nibpData) {
     if (!currentSessionId) { console.warn('[Network] Cannot send NIBP trigger, not in a session.'); return; }
     console.log('[Network] Sending NIBP trigger command with data:', nibpData);
     sendMessage({ type: 'nibp_trigger', sessionId: currentSessionId, nibpData: nibpData });
+}
+
+export function requestSessionList() {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        console.warn('[Network] Cannot request session list: WebSocket not open.');
+        // still try to connect and schedule request after connect? For now notify caller by returning false
+        return false;
+    }
+    sendMessage({ type: 'list_sessions' });
+    return true;
 }
 
 export function sendSoundStateUpdate(soundState) {
@@ -598,4 +717,67 @@ function handleCopyLink() {
 // --- Get Current Role ---
 export function getCurrentRole() {
     return currentRole;
+}
+
+export function leaveSession(skipConfirm = false) {
+    console.log('[Network] leaveSession called by UI. skipConfirm=', !!skipConfirm);
+    // Ask user for confirmation before leaving session unless skipConfirm requested
+    if (!skipConfirm) {
+        try {
+            if (!confirm('Are you sure you want to leave the session and return to Home?')) return;
+        } catch (e) {
+            // If confirm is unavailable, proceed
+        }
+    }
+
+    // Do not send a 'leave_session' message - server does not recognize it.
+    // Perform local cleanup and UI update instead.
+    currentSessionId = null;
+    if (sessionIdInput) sessionIdInput.value = '';
+    updateConnectionStatus('Disconnected', 'bg-danger');
+    hideSessionShareArea();
+    updateUIForRole(currentRole);
+
+    // Navigate UI back to landing view if present
+    try {
+        const landingView = document.getElementById('landing-view');
+        const appView = document.getElementById('app-view');
+        if (landingView && appView) {
+            appView.style.display = 'none';
+            landingView.style.display = 'block';
+            const landingMenu = document.getElementById('landing-menu');
+            const landingJoin = document.getElementById('landing-join');
+            const landingLobby = document.getElementById('landing-lobby');
+            const landingSessions = document.getElementById('landing-sessions');
+            const sessionIdDisplay = document.getElementById('landing-session-id-display');
+            const qrContainer = document.getElementById('landing-qr-container');
+            const sessionsList = document.getElementById('landing-sessions-list');
+            if (landingMenu) landingMenu.classList.remove('d-none');
+            if (landingJoin) landingJoin.classList.add('d-none');
+            if (landingLobby) landingLobby.classList.add('d-none');
+            if (landingSessions) landingSessions.classList.add('d-none');
+            if (sessionIdDisplay) sessionIdDisplay.textContent = '--';
+            if (qrContainer) qrContainer.innerHTML = '';
+            if (sessionsList) sessionsList.innerHTML = '';
+        }
+    } catch (e) { console.warn('[Network] leaveSession UI navigation failed:', e); }
+}
+
+export function endSession() {
+    // Attempt to end current session by sending adminToken to server
+    if (!currentSessionId) { alert('No active session to end.'); return; }
+    const key = `medicalMonitorAdminToken_${currentSessionId}`;
+    const token = localStorage.getItem(key);
+    if (!token) { alert('Admin token not found. Only session owner can end the session.'); return; }
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        alert('Not connected to server. Cannot end session remotely.');
+        return;
+    }
+    try {
+        sendMessage({ type: 'end_session', sessionId: currentSessionId, adminToken: token });
+        console.log('[Network] Sent end_session request to server.');
+    } catch (e) {
+        console.error('[Network] Failed to send end_session request:', e);
+        alert('Failed to send end session request.');
+    }
 }

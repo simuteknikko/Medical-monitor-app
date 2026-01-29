@@ -30,9 +30,15 @@ app.use(express.static(path.join(__dirname, '/')));
 app.use('/ecgGenerators', express.static(path.join(__dirname, 'ecgGenerators')));
 
 // --- Server State ---
-// Store active sessions. Key: sessionId, Value: Set of connected WebSocket clients (ws)
-const sessions = {}; // E.g., { "ABCD": Set(ws1, ws2), "EFGH": Set(ws3) }
+// Store active sessions. Key: sessionId, Value: session object
+// session = { clients: Set(ws), adminToken: string|null, createdAt: number, lastActiveAt: number }
+const sessions = {}; // E.g., { "ABCD": { clients: Set(ws1, ws2), adminToken: '...', createdAt: 0, lastActiveAt: 0 } }
 let keepAliveInterval = null; // Variable to hold the interval ID
+let sessionCleanupInterval = null;
+
+// TTL / cleanup settings for persisted sessions
+const SESSION_TTL_MS = parseInt(process.env.SESSION_TTL_MS) || 24 * 60 * 60 * 1000; // default 24 hours
+const SESSION_CLEANUP_INTERVAL_MS = parseInt(process.env.SESSION_CLEANUP_INTERVAL_MS) || 60 * 60 * 1000; // default 1 hour
 
 // --- Helper Functions ---
 
@@ -60,6 +66,11 @@ function generateSessionId(length) {
         return null;
     }
     return result;
+}
+
+function generateAdminToken() {
+    // Simple random token - sufficient for this minimal approach
+    return Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
 }
 
 /**
@@ -91,16 +102,15 @@ function sendMessage(ws, message) {
  * @param {string | null} [targetRole=null] - (Optional) Role to target ('controller', 'monitor'). If null, sends to all (excluding sender).
  */
 function broadcastToSession(sessionId, message, senderWs, targetRole = null) {
-    const sessionClients = sessions[sessionId];
-    if (!sessionClients) {
+    const sessionObj = sessions[sessionId];
+    if (!sessionObj) {
         console.warn(`[Server] Attempted to broadcast to non-existent session: ${sessionId}`);
         return;
     }
-
     const messageString = JSON.stringify(message);
     console.log(`[Server] Broadcasting to session ${sessionId} (Target: ${targetRole || 'all'}):`, message);
 
-    sessionClients.forEach(client => {
+    sessionObj.clients.forEach(client => {
         const shouldSend =
             client !== senderWs &&
             client.readyState === WebSocket.OPEN &&
@@ -122,15 +132,13 @@ function broadcastToSession(sessionId, message, senderWs, targetRole = null) {
  */
 function cleanupClientConnection(ws) {
      if (ws.sessionId && sessions[ws.sessionId]) {
-        const wasRemoved = sessions[ws.sessionId].delete(ws); // Remove client from the session Set
+        const sessionObj = sessions[ws.sessionId];
+        const wasRemoved = sessionObj.clients.delete(ws); // Remove client from the session Set
         if(wasRemoved) {
              console.log(`[Server] Client ${ws.clientId} removed from session: ${ws.sessionId}`);
         }
-        // If the session becomes empty, delete it
-        if (sessions[ws.sessionId].size === 0) {
-            delete sessions[ws.sessionId];
-            console.log(`[Server] Deleted empty session: ${ws.sessionId}`);
-        }
+        // Do not delete the session when empty - persist it so others can rejoin or owner can reclaim.
+        sessionObj.lastActiveAt = Date.now();
         ws.sessionId = null; // Clear session ID from the connection object
         ws.role = null;      // Clear role
     }
@@ -186,11 +194,12 @@ wss.on('connection', (ws, req) => {
                 cleanupClientConnection(ws); // Remove from previous session first
                 const newSessionId = generateSessionId(SESSION_ID_LENGTH);
                 if (newSessionId) {
-                    sessions[newSessionId] = new Set([ws]); // Create session with this client
+                    const adminToken = generateAdminToken();
+                    sessions[newSessionId] = { clients: new Set([ws]), adminToken: adminToken, createdAt: Date.now(), lastActiveAt: Date.now() };
                     ws.sessionId = newSessionId;
                     ws.role = null; // Role needs to be set explicitly
-                    console.log(`[Server] Client ${ws.clientId} created session: ${newSessionId}`);
-                    sendMessage(ws, { type: 'session_created', sessionId: newSessionId });
+                    console.log(`[Server] Client ${ws.clientId} created session: ${newSessionId} (admin token issued)`);
+                    sendMessage(ws, { type: 'session_created', sessionId: newSessionId, adminToken: adminToken });
                 } else {
                     sendMessage(ws, { type: 'error', message: 'Failed to create a unique session ID. Please try again.' });
                 }
@@ -204,14 +213,44 @@ wss.on('connection', (ws, req) => {
                 const targetSessionId = sessionId.toUpperCase();
                 if (sessions[targetSessionId]) {
                     cleanupClientConnection(ws); // Remove from previous session first
-                    sessions[targetSessionId].add(ws); // Add to the existing session
+                    const sessionObj = sessions[targetSessionId];
+                    // If an adminToken was provided and matches, mark this connection as owner
+                    const providedAdminToken = parsedMessage && parsedMessage.adminToken;
+                    if (providedAdminToken && sessionObj.adminToken && providedAdminToken === sessionObj.adminToken) {
+                        ws.isOwner = true;
+                        console.log(`[Server] Owner token validated for ${ws.clientId} joining session ${targetSessionId}`);
+                    } else {
+                        ws.isOwner = false;
+                    }
+                    sessionObj.clients.add(ws); // Add to the existing session
+                    sessionObj.lastActiveAt = Date.now();
                     ws.sessionId = targetSessionId;
                     ws.role = null; // Role needs to be set explicitly
                     console.log(`[Server] Client ${ws.clientId} joined session: ${targetSessionId}`);
-                    sendMessage(ws, { type: 'session_joined', sessionId: targetSessionId });
+                    sendMessage(ws, { type: 'session_joined', sessionId: targetSessionId, admin: !!ws.isOwner });
                 } else {
                     console.log(`[Server] Client ${ws.clientId} failed to join session: ${targetSessionId} (Not Found)`);
                     sendMessage(ws, { type: 'session_not_found', sessionId: targetSessionId });
+                }
+                break;
+
+            case 'list_sessions':
+                // Return a lightweight list of known sessions (including empty/persisted ones)
+                try {
+                    const list = Object.keys(sessions).map(id => {
+                        const s = sessions[id];
+                        return {
+                            sessionId: id,
+                            createdAt: s.createdAt,
+                            lastActiveAt: s.lastActiveAt,
+                            clientCount: s.clients ? s.clients.size : 0,
+                            hasAdmin: !!s.adminToken
+                        };
+                    });
+                    sendMessage(ws, { type: 'session_list', sessions: list });
+                } catch (e) {
+                    console.error('[Server] Error building session list:', e);
+                    sendMessage(ws, { type: 'error', message: 'Failed to build session list.' });
                 }
                 break;
 
@@ -277,6 +316,24 @@ wss.on('connection', (ws, req) => {
                 break;
             // --- LISÄYS LOPPUU ---
 
+            case 'end_session':
+                // Admin-only: requires adminToken in message
+                if (!sessionId || typeof sessionId !== 'string') { sendMessage(ws, { type: 'error', message: 'Invalid or missing sessionId for end_session.' }); return; }
+                const target = sessions[sessionId];
+                if (!target) { sendMessage(ws, { type: 'error', message: 'Session not found.' }); return; }
+                const providedToken = parsedMessage.adminToken;
+                if (!providedToken || providedToken !== target.adminToken) { sendMessage(ws, { type: 'error', message: 'Invalid admin token. Only session owner can end session.' }); return; }
+                // Notify all clients in session that it has ended, then remove session
+                try {
+                    target.clients.forEach(client => {
+                        try { sendMessage(client, { type: 'session_ended', sessionId: sessionId, reason: 'Ended by owner' }); } catch (e) { /* ignore */ }
+                        client.sessionId = null; client.role = null;
+                    });
+                } catch (e) { console.error('[Server] Error notifying clients of session end:', e); }
+                delete sessions[sessionId];
+                console.log(`[Server] Session ${sessionId} ended by owner and deleted.`);
+                break;
+
             default:
                 console.log(`[Server] Unknown message type from ${ws.clientId}: ${type}`);
                 sendMessage(ws, { type: 'error', message: `Unknown message type: ${type}` });
@@ -326,6 +383,24 @@ function startKeepAlive() {
         });
     }, PING_INTERVAL);
 }
+// --- SESSION CLEANUP: Remove stale sessions that have been empty for longer than TTL ---
+function startSessionCleanup() {
+    console.log(`[Server] Starting session cleanup interval (${SESSION_CLEANUP_INTERVAL_MS}ms), TTL=${SESSION_TTL_MS}ms`);
+    if (sessionCleanupInterval) clearInterval(sessionCleanupInterval);
+    sessionCleanupInterval = setInterval(() => {
+        try {
+            const now = Date.now();
+            Object.keys(sessions).forEach(id => {
+                const s = sessions[id];
+                const clientCount = s.clients ? s.clients.size : 0;
+                if (clientCount === 0 && s.lastActiveAt && (now - s.lastActiveAt) > SESSION_TTL_MS) {
+                    console.log(`[Server] Cleaning up stale session ${id} (lastActiveAt=${new Date(s.lastActiveAt).toISOString()}).`);
+                    try { delete sessions[id]; } catch (e) { console.error('[Server] Failed to delete stale session', id, e); }
+                }
+            });
+        } catch (e) { console.error('[Server] Error during session cleanup:', e); }
+    }, SESSION_CLEANUP_INTERVAL_MS);
+}
 // --- /KEEP-ALIVE ---
 
 // --- Start the HTTP server and Keep-Alive ---
@@ -333,6 +408,7 @@ server.listen(PORT, () => {
     console.log(`[Server] HTTP server listening on port ${PORT}`);
     console.log(`[Server] WebSocket server is running and ready for connections.`);
     startKeepAlive(); // Start the ping interval when server is ready
+    startSessionCleanup(); // Start session cleanup loop
 });
 
 // --- Graceful Shutdown (Optional but Recommended) ---
