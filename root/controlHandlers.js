@@ -1009,6 +1009,8 @@ function _handleNewCase(monitorInstance) {
     }
     _saveCasesToStorage();
     _renderPresetsForSelectedCase(monitorInstance);
+    // Ensure UI buttons (Add/Upload/Save preset, etc.) reflect the new case state
+    _updateCaseUIState(monitorInstance);
 }
 
 function _handleDeleteCase(monitorInstance) {
