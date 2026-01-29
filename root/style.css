@@ -396,6 +396,9 @@ body.fullscreen-active .monitor-display {
     overflow: hidden;
 }
 
+  /* Default vitals scale variable for fullscreen — updated by JS based on visible vitals */
+  body.fullscreen-active { --vitals-scale: 1; }
+
 /* Varmistetaan, että .col-12 (parametririvit) täyttävät grid-rivinsä korkeuden */
 body.fullscreen-active .monitor-display > .col-12 {
     display: flex;
@@ -479,14 +482,17 @@ body.fullscreen-active .vitals-area {
 body.fullscreen-active .ct-chart { width: 100%; height: 100%; }
 
 /* Fonttikoot fullscreenissä, käytetään enemmän vh-yksiköitä */
-body.fullscreen-active .vitals-numeric { font-size: clamp(1.5rem, 3.5vh, 3rem); line-height: 1.0; } /* Pienennetty hieman */
-body.fullscreen-active #abp-container .vitals-numeric { font-size: clamp(1.4rem, 3.2vh, 2.8rem); }
-body.fullscreen-active #nibp-container .vitals-numeric { font-size: clamp(1.2rem, 2.8vh, 2.4rem); }
-body.fullscreen-active #temp-container .vitals-numeric { font-size: clamp(1.3rem, 2.9vh, 2.5rem); }
+/* Slightly larger numeric fonts in fullscreen for improved readability */
+/* Fullscreen: slightly larger, responsive numeric sizes for all vitals */
+body.fullscreen-active .vitals-numeric { font-size: clamp(1.6rem, calc(4.6vh * var(--vitals-scale, 1)), 7.0rem); line-height: 1.0; }
+body.fullscreen-active #ecg-container .vitals-numeric { font-size: clamp(1.8rem, calc(5.2vh * var(--vitals-scale, 1)), 8.0rem); }
+body.fullscreen-active #abp-container .vitals-numeric { font-size: clamp(1.4rem, calc(4.0vh * var(--vitals-scale, 1)), 6.0rem); }
+body.fullscreen-active #nibp-container .vitals-numeric { font-size: clamp(1.2rem, calc(3.6vh * var(--vitals-scale, 1)), 8.5rem); }
+body.fullscreen-active #temp-container .vitals-numeric { font-size: clamp(1.2rem, calc(3.6vh * var(--vitals-scale, 1)), 6.0rem); }
 body.fullscreen-active #etco2-container .waveform-footer-area .rr-label-large { font-size: clamp(1.1rem, 2.5vh, 1.7rem); }
 
-body.fullscreen-active .vitals-numeric .unit { font-size: clamp(0.5rem, 1vh, 0.9rem); }
-body.fullscreen-active .vitals-numeric .unit-multiline { font-size: clamp(0.5rem, 1vh, 0.8rem); line-height: 1.05; }
+body.fullscreen-active .vitals-numeric .unit { font-size: clamp(0.6rem, 1.1vh, 1.0rem); }
+body.fullscreen-active .vitals-numeric .unit-multiline { font-size: clamp(0.6rem, 1.1vh, 0.95rem); line-height: 1.05; }
 body.fullscreen-active .waveform-title { font-size: clamp(0.75rem, 1.5vh, 1rem); padding: 2px 4px; }
 body.fullscreen-active .rhythm-label { font-size: clamp(0.6rem, 1.2vh, 0.8rem); }
 body.fullscreen-active .waveform-footer-area { padding: 2px 4px; }
@@ -500,6 +506,48 @@ body.fullscreen-active #temp-container-wrapper {
      flex-basis: 0; flex-grow: 1; max-width: 50%; display: flex;
      flex-direction: column;
      min-height: 0;
+}
+
+/* When ABP is turned off while fullscreen is active, we have more vertical
+   space available — make NIBP numerics significantly larger for readability. */
+body.fullscreen-active.abp-hidden #nibp-container .vitals-numeric {
+  /* Much larger NIBP numeric for fullscreen when ABP is hidden; also respect vitals-scale */
+  font-size: clamp(2.6rem, calc(10vh * var(--vitals-scale, 1)), 10.0rem);
+  line-height: 1.0;
+  flex: 1 1 0;
+  text-align: right;
+  white-space: nowrap;
+  overflow: visible;
+}
+body.fullscreen-active.abp-hidden #nibp-container .vitals-numeric .unit-multiline {
+  font-size: clamp(0.7rem, 1.6vh, 1.1rem);
+}
+
+/* Ensure header layout allows the numeric to grow into available space */
+body.fullscreen-active.abp-hidden #nibp-container .waveform-header {
+  align-items: center;
+  gap: 8px;
+}
+body.fullscreen-active.abp-hidden #nibp-container .header-left {
+  flex: 0 0 auto;
+}
+
+/* When NIBP is expanded (ABP hidden) also scale other vitals so sizes stay balanced */
+body.fullscreen-active.abp-hidden #ecg-container .vitals-numeric {
+  font-size: clamp(2.0rem, calc(6.2vh * var(--vitals-scale, 1)), 8.8rem);
+}
+body.fullscreen-active.abp-hidden #spo2-container .vitals-numeric {
+  font-size: clamp(2.0rem, calc(6.0vh * var(--vitals-scale, 1)), 8.2rem);
+}
+body.fullscreen-active.abp-hidden #etco2-container .vitals-numeric {
+  font-size: clamp(1.6rem, calc(5.2vh * var(--vitals-scale, 1)), 6.8rem);
+}
+body.fullscreen-active.abp-hidden #temp-container .vitals-numeric {
+  font-size: clamp(1.4rem, calc(4.4vh * var(--vitals-scale, 1)), 6.0rem);
+}
+body.fullscreen-active.abp-hidden .vitals-numeric .unit,
+body.fullscreen-active.abp-hidden .vitals-numeric .unit-multiline {
+  font-size: clamp(0.7rem, calc(1.2vh * var(--vitals-scale, 1)), 1.25rem);
 }
 
 
@@ -601,10 +649,10 @@ body.fullscreen-active #temp-container-wrapper {
         aspect-ratio: 11 / 1;
     }
 
-    body.fullscreen-active .vitals-numeric { font-size: clamp(1.6rem, 3.5vh, 2.8rem); }
-    body.fullscreen-active #abp-container .vitals-numeric { font-size: clamp(1.5rem, 3.2vh, 2.6rem); }
-    body.fullscreen-active #nibp-container .vitals-numeric { font-size: clamp(1.3rem, 2.8vh, 2.3rem); }
-    body.fullscreen-active #temp-container .vitals-numeric { font-size: clamp(1.4rem, 2.9vh, 2.4rem); }
+    body.fullscreen-active .vitals-numeric { font-size: clamp(1.2rem, calc(3.5vh * var(--vitals-scale,1)), 3.2rem); }
+    body.fullscreen-active #abp-container .vitals-numeric { font-size: clamp(1.1rem, calc(3.2vh * var(--vitals-scale,1)), 2.9rem); }
+    body.fullscreen-active #nibp-container .vitals-numeric { font-size: clamp(1.0rem, calc(2.8vh * var(--vitals-scale,1)), 2.7rem); }
+    body.fullscreen-active #temp-container .vitals-numeric { font-size: clamp(1.0rem, calc(2.9vh * var(--vitals-scale,1)), 2.8rem); }
     body.fullscreen-active #etco2-container .waveform-footer-area .rr-label-large { font-size: clamp(1.2rem, 2.5vh, 1.8rem); }
     body.fullscreen-active .waveform-title { font-size: clamp(0.8rem, 1.6vh, 1rem); padding: 1px 3px; }
     body.fullscreen-active .waveform-footer-area { padding: 1px 3px; }

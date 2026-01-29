@@ -57,6 +57,41 @@ export function updateMonitorVisibility(monitorElements, currentParams) {
       console.warn(`[updateMonitorVisibility] Wrapper element missing for key: ${key}`);
     }
   }
+    // If ABP visibility changed, reflect that state on the body so fullscreen
+    // styles can respond (e.g. make NIBP much larger when ABP is off).
+    try {
+        const abpVisible = !!(currentParams && currentParams.abp && currentParams.abp.visible);
+        document.body.classList.toggle('abp-hidden', !abpVisible);
+
+        // Compute how many primary vitals are visible so we can scale numbers
+        // dynamically when there is extra room (e.g., other vitals toggled off).
+        const vitalKeys = ['ecg','spo2','abp','etco2','nibp','temp'];
+        let visibleCount = 0;
+        for (const k of vitalKeys) {
+            if (currentParams && currentParams[k] && currentParams[k].visible) visibleCount += 1;
+        }
+
+        // Map visibleCount -> base scale multiplier. Fewer visible vitals -> larger numbers.
+        let baseScale = 1.0;
+        if (visibleCount <= 1) baseScale = 2.4; // almost only one vital visible -> extra large
+        else if (visibleCount === 2) baseScale = 2.1;
+        else if (visibleCount === 3) baseScale = 1.6;
+        else baseScale = 1.0; // 4+ vitals visible -> default scaling
+
+        // Adjust scale based on viewport width to avoid breaking small tablets.
+        const vw = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 1200;
+        let maxScale = 2.4;
+        if (vw < 800) maxScale = 1.15; // small devices (likely phones / small tablets)
+        else if (vw < 1000) maxScale = 1.5; // 10" tablets and similar
+        else if (vw < 1400) maxScale = 2.0;
+
+        let scale = Math.min(baseScale, maxScale);
+        // Ensure scale stays within reasonable bounds
+        scale = Math.max(0.9, Math.min(2.8, scale));
+        document.body.style.setProperty('--vitals-scale', String(scale));
+    } catch (e) {
+        /* noop */
+    }
 }
 
 export function updateVitalsDisplay(currentParams) {
