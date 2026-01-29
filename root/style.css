@@ -484,11 +484,11 @@ body.fullscreen-active .ct-chart { width: 100%; height: 100%; }
 /* Fonttikoot fullscreenissä, käytetään enemmän vh-yksiköitä */
 /* Slightly larger numeric fonts in fullscreen for improved readability */
 /* Fullscreen: slightly larger, responsive numeric sizes for all vitals */
-body.fullscreen-active .vitals-numeric { font-size: clamp(1.6rem, calc(4.6vh * var(--vitals-scale, 1)), 5.0rem); line-height: 1.0; }
-body.fullscreen-active #ecg-container .vitals-numeric { font-size: clamp(1.8rem, calc(5.2vh * var(--vitals-scale, 1)), 6.0rem); }
-body.fullscreen-active #abp-container .vitals-numeric { font-size: clamp(1.4rem, calc(4.0vh * var(--vitals-scale, 1)), 4.6rem); }
-body.fullscreen-active #nibp-container .vitals-numeric { font-size: clamp(1.2rem, calc(3.6vh * var(--vitals-scale, 1)), 4.8rem); }
-body.fullscreen-active #temp-container .vitals-numeric { font-size: clamp(1.2rem, calc(3.6vh * var(--vitals-scale, 1)), 4.2rem); }
+body.fullscreen-active .vitals-numeric { font-size: clamp(1.6rem, calc(4.6vh * var(--vitals-scale, 1)), 7.0rem); line-height: 1.0; }
+body.fullscreen-active #ecg-container .vitals-numeric { font-size: clamp(1.8rem, calc(5.2vh * var(--vitals-scale, 1)), 8.0rem); }
+body.fullscreen-active #abp-container .vitals-numeric { font-size: clamp(1.4rem, calc(4.0vh * var(--vitals-scale, 1)), 6.0rem); }
+body.fullscreen-active #nibp-container .vitals-numeric { font-size: clamp(1.2rem, calc(3.6vh * var(--vitals-scale, 1)), 8.5rem); }
+body.fullscreen-active #temp-container .vitals-numeric { font-size: clamp(1.2rem, calc(3.6vh * var(--vitals-scale, 1)), 6.0rem); }
 body.fullscreen-active #etco2-container .waveform-footer-area .rr-label-large { font-size: clamp(1.1rem, 2.5vh, 1.7rem); }
 
 body.fullscreen-active .vitals-numeric .unit { font-size: clamp(0.6rem, 1.1vh, 1.0rem); }
@@ -512,7 +512,7 @@ body.fullscreen-active #temp-container-wrapper {
    space available — make NIBP numerics significantly larger for readability. */
 body.fullscreen-active.abp-hidden #nibp-container .vitals-numeric {
   /* Much larger NIBP numeric for fullscreen when ABP is hidden; also respect vitals-scale */
-  font-size: clamp(2.6rem, calc(10vh * var(--vitals-scale, 1)), 8.0rem);
+  font-size: clamp(2.6rem, calc(10vh * var(--vitals-scale, 1)), 10.0rem);
   line-height: 1.0;
   flex: 1 1 0;
   text-align: right;
@@ -530,6 +530,24 @@ body.fullscreen-active.abp-hidden #nibp-container .waveform-header {
 }
 body.fullscreen-active.abp-hidden #nibp-container .header-left {
   flex: 0 0 auto;
+}
+
+/* When NIBP is expanded (ABP hidden) also scale other vitals so sizes stay balanced */
+body.fullscreen-active.abp-hidden #ecg-container .vitals-numeric {
+  font-size: clamp(2.0rem, calc(6.2vh * var(--vitals-scale, 1)), 8.8rem);
+}
+body.fullscreen-active.abp-hidden #spo2-container .vitals-numeric {
+  font-size: clamp(2.0rem, calc(6.0vh * var(--vitals-scale, 1)), 8.2rem);
+}
+body.fullscreen-active.abp-hidden #etco2-container .vitals-numeric {
+  font-size: clamp(1.6rem, calc(5.2vh * var(--vitals-scale, 1)), 6.8rem);
+}
+body.fullscreen-active.abp-hidden #temp-container .vitals-numeric {
+  font-size: clamp(1.4rem, calc(4.4vh * var(--vitals-scale, 1)), 6.0rem);
+}
+body.fullscreen-active.abp-hidden .vitals-numeric .unit,
+body.fullscreen-active.abp-hidden .vitals-numeric .unit-multiline {
+  font-size: clamp(0.7rem, calc(1.2vh * var(--vitals-scale, 1)), 1.25rem);
 }
 
 
