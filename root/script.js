@@ -1481,14 +1481,14 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             // Only update visuals/play sounds on active monitor devices
             try {
-                const role = getCurrentRole();
-                if (role === 'monitor' && this.animationRunning) {
-                    updateAlarmVisuals();
-                    try { triggerAlarmSounds(newlyActive); } catch (e) { /* ignore sound errors */ }
-                }
-            } catch (e) {
-                console.error('[Script] Error while gating alarm visuals/sounds:', e);
+            const role = getCurrentRole();
+            if (this.animationRunning) {
+              updateAlarmVisuals();
+              try { if (role === 'monitor') triggerAlarmSounds(newlyActive); } catch (e) { /* ignore sound errors */ }
             }
+          } catch (e) {
+            console.error('[Script] Error while gating alarm visuals/sounds:', e);
+          }
             this.previousActiveAlarms = currentActive;
           } catch (e) {
             console.error('[Script] Error evaluating alarms after applying remote thresholds:', e);
@@ -1922,11 +1922,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     newlyActiveAlarms[key] = true;
                 }
             }
-            try {
+              try {
               const role = getCurrentRole();
-              if (role === 'monitor' && this.animationRunning) {
+              if (this.animationRunning) {
                 updateAlarmVisuals();
-                triggerAlarmSounds(newlyActiveAlarms);
+                try { if (role === 'monitor') triggerAlarmSounds(newlyActiveAlarms); } catch (e) { /* ignore sound errors */ }
               }
             } catch (e) {
               console.error('[Script] Error gating alarm visuals/sounds:', e);

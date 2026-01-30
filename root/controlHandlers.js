@@ -544,19 +544,48 @@ function _handleUpdateVitalsClick(monitorInstance) {
             console.error("[applyFn] initiateParameterChange function not found on monitorInstance!"); 
         }
 
-            // After initiating parameter change, ensure alarm thresholds are evaluated
+            // After initiating parameter change, ensure alarm thresholds are evaluated.
+            // Use a temp copy of currentParams but prefer immediate target HR (when
+            // the current rhythm is not pulseless) so alarms evaluate against the
+            // user-updated numeric value without breaking interpolation of the
+            // waveform model.
             try {
                 if (typeof checkAlarms === 'function' && monitorInstance.currentParams) {
-                    const currentActive = checkAlarms(monitorInstance.currentParams);
+                    let paramsForCheck;
+                    try {
+                        paramsForCheck = JSON.parse(JSON.stringify(monitorInstance.currentParams));
+                        const curEcgRuntimeParams = paramsForCheck.ecg?.params;
+                        const isPulseless = curEcgRuntimeParams && (curEcgRuntimeParams.isPEA || curEcgRuntimeParams.isChaotic || curEcgRuntimeParams.isFlat || (curEcgRuntimeParams.isArtifact && curEcgRuntimeParams.artifactType === 'cpr') || monitorInstance.currentParams.ecg?.rhythm === 'vt_pulseless');
+                        if (monitorInstance.targetParams?.ecg && !isPulseless) {
+                            paramsForCheck.ecg = paramsForCheck.ecg || {};
+                            paramsForCheck.ecg.hr = monitorInstance.targetParams.ecg.hr;
+                        }
+                    } catch (innerErr) {
+                        console.warn('[applyFn] Could not build temp params for alarm check, falling back to currentParams:', innerErr);
+                        paramsForCheck = monitorInstance.currentParams;
+                    }
+
+                    const currentActive = checkAlarms(paramsForCheck);
+                    // Debug logs to help diagnose why alarms may not trigger
+                    try {
+                        const hrForCheck = paramsForCheck.ecg?.hr;
+                        const curEcgParams = paramsForCheck.ecg?.params;
+                        const isPulselessForCheck = curEcgParams && (curEcgParams.isPEA || curEcgParams.isChaotic || curEcgParams.isFlat || (curEcgParams.isArtifact && curEcgParams.artifactType === 'cpr') || monitorInstance.currentParams.ecg?.rhythm === 'vt_pulseless');
+                        console.log('[applyFn][AlarmCheck] hrForCheck=', hrForCheck, 'isPulseless=', isPulselessForCheck, 'ecgParams=', curEcgParams);
+                        console.log('[applyFn][AlarmCheck] thresholds ecg=', paramsForCheck.alarms?.ecg, 'full alarms=', paramsForCheck.alarms);
+                        console.log('[applyFn][AlarmCheck] checkAlarms result=', currentActive);
+                    } catch (dbgErr) {
+                        console.warn('[applyFn][AlarmCheck] debug logging failed', dbgErr);
+                    }
                     const newlyActive = {};
                     for (const k in currentActive) {
                         if (currentActive[k] && !monitorInstance.previousActiveAlarms?.[k]) newlyActive[k] = true;
                     }
                     try {
                         const role = getCurrentRole();
-                        if (role === 'monitor' && monitorInstance.animationRunning) {
+                        if (monitorInstance.animationRunning) {
                             updateAlarmVisuals();
-                            try { triggerAlarmSounds(newlyActive); } catch (e) { /* ignore sound errors */ }
+                            try { if (role === 'monitor') triggerAlarmSounds(newlyActive); } catch (e) { /* ignore sound errors */ }
                         }
                     } catch (e) {
                         console.error('[applyFn] Error while gating alarm visuals/sounds:', e);
