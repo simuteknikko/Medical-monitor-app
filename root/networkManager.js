@@ -135,7 +135,21 @@ function connectWebSocket() {
             isAttemptingAutoJoin = false;
         } else if (currentSessionId && currentRole) {
             console.log(`[Network] Reconnected. Attempting to re-join session ${currentSessionId} as ${currentRole}.`);
-            sendMessage({ type: 'join_session', sessionId: currentSessionId });
+            try {
+                // If we previously persisted a device ID+token for this session, attempt rejoin with it
+                const deviceKey = `medicalMonitorDevice_${currentSessionId}_id`;
+                const tokenKey = `medicalMonitorDevice_${currentSessionId}_token`;
+                let deviceId = null, deviceToken = null;
+                try { deviceId = localStorage.getItem(deviceKey); deviceToken = localStorage.getItem(tokenKey); } catch (e) { deviceId = null; deviceToken = null; }
+                if (deviceId && deviceToken) {
+                    console.log('[Network] Found stored device credentials, attempting device rejoin.');
+                    sendMessage({ type: 'rejoin_with_device', sessionId: currentSessionId, deviceId: deviceId, deviceToken: deviceToken });
+                } else {
+                    sendMessage({ type: 'join_session', sessionId: currentSessionId });
+                }
+            } catch (e) {
+                sendMessage({ type: 'join_session', sessionId: currentSessionId });
+            }
         }
     };
 
@@ -247,6 +261,14 @@ function handleServerMessage(message) {
             if (message.adminToken) {
                 try { localStorage.setItem(`medicalMonitorAdminToken_${currentSessionId}`, message.adminToken); console.log('[Network] Admin token saved to localStorage.'); } catch (e) { console.warn('[Network] Failed to save admin token:', e); }
             }
+            // Persist per-device credentials if server issued them
+            if (message.deviceId && message.deviceToken) {
+                try {
+                    localStorage.setItem(`medicalMonitorDevice_${currentSessionId}_id`, message.deviceId);
+                    localStorage.setItem(`medicalMonitorDevice_${currentSessionId}_token`, message.deviceToken);
+                    console.log('[Network] Device credentials saved to localStorage for session:', currentSessionId);
+                } catch (e) { console.warn('[Network] Failed to save device credentials:', e); }
+            }
             if (typeof onSessionCreatedCallback === 'function') {
                 onSessionCreatedCallback(currentSessionId);
             }
@@ -262,6 +284,8 @@ function handleServerMessage(message) {
                 try {
                     const key = `medicalMonitorAdminToken_${message.sessionId}`;
                     localStorage.removeItem(key);
+                    localStorage.removeItem(`medicalMonitorDevice_${message.sessionId}_id`);
+                    localStorage.removeItem(`medicalMonitorDevice_${message.sessionId}_token`);
                 } catch (e) { /* ignore */ }
                 // Refresh sessions list UI if present
                 try { requestSessionList(); } catch (e) { /* ignore */ }
@@ -299,8 +323,26 @@ function handleServerMessage(message) {
                 const key = `medicalMonitorAdminToken_${currentSessionId}`;
                 try { if (!localStorage.getItem(key)) localStorage.setItem(key, 'RETAINED'); } catch (e) {}
             }
+            // Persist per-device credentials if server issued them
+            if (message.deviceId && message.deviceToken) {
+                try {
+                    localStorage.setItem(`medicalMonitorDevice_${currentSessionId}_id`, message.deviceId);
+                    localStorage.setItem(`medicalMonitorDevice_${currentSessionId}_token`, message.deviceToken);
+                    console.log('[Network] Device credentials saved to localStorage for session:', currentSessionId);
+                } catch (e) { console.warn('[Network] Failed to save device credentials:', e); }
+            }
             if (!isAttemptingAutoJoin && !reconnectTimerId) {
                  alert(`Joined session: ${currentSessionId}`);
+            }
+            sendSetRole(currentRole);
+            updateConnectionStatus(`Session: ${currentSessionId}`, 'bg-success');
+            break;
+        case 'session_rejoined':
+            // Server confirmed rejoin using stored device credentials
+            currentSessionId = message.sessionId;
+            console.log(`[Network] Successfully rejoined session: ${currentSessionId} as stored device.`);
+            if (typeof onSessionJoinedCallback === 'function') {
+                try { onSessionJoinedCallback(currentSessionId, false); } catch(e) { onSessionJoinedCallback(currentSessionId); }
             }
             sendSetRole(currentRole);
             updateConnectionStatus(`Session: ${currentSessionId}`, 'bg-success');
@@ -573,7 +615,42 @@ export function requestSessionList() {
         // still try to connect and schedule request after connect? For now notify caller by returning false
         return false;
     }
-    sendMessage({ type: 'list_sessions' });
+    // Gather stored admin tokens and device credentials from localStorage so the server
+    // can reveal only sessions this client is authorized to see.
+    const devices = [];
+    const adminTokens = [];
+    try {
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (!key) continue;
+            // device id key: medicalMonitorDevice_<SESSION>_id
+            const m = key.match(/^medicalMonitorDevice_(.+)_id$/);
+            if (m) {
+                const sid = m[1];
+                const idKey = `medicalMonitorDevice_${sid}_id`;
+                const tokKey = `medicalMonitorDevice_${sid}_token`;
+                try {
+                    const deviceId = localStorage.getItem(idKey);
+                    const deviceToken = localStorage.getItem(tokKey);
+                    if (deviceId && deviceToken) devices.push({ sessionId: sid, deviceId, deviceToken });
+                } catch (e) {}
+            }
+            // admin token key: medicalMonitorAdminToken_<SESSION>
+            const ma = key.match(/^medicalMonitorAdminToken_(.+)$/);
+            if (ma) {
+                const sid = ma[1];
+                try {
+                    const adminToken = localStorage.getItem(key);
+                    if (adminToken) adminTokens.push({ sessionId: sid, adminToken });
+                } catch (e) {}
+            }
+        }
+    } catch (e) {
+        console.warn('[Network] Failed to read stored session credentials:', e);
+    }
+
+    // Send credentials to server so server can reveal only authorized sessions
+    sendMessage({ type: 'list_sessions', devices, adminTokens });
     return true;
 }
 
@@ -732,6 +809,12 @@ export function leaveSession(skipConfirm = false) {
 
     // Do not send a 'leave_session' message - server does not recognize it.
     // Perform local cleanup and UI update instead.
+    try {
+        if (currentSessionId) {
+            localStorage.removeItem(`medicalMonitorDevice_${currentSessionId}_id`);
+            localStorage.removeItem(`medicalMonitorDevice_${currentSessionId}_token`);
+        }
+    } catch (e) {}
     currentSessionId = null;
     if (sessionIdInput) sessionIdInput.value = '';
     updateConnectionStatus('Disconnected', 'bg-danger');
@@ -776,6 +859,11 @@ export function endSession() {
     try {
         sendMessage({ type: 'end_session', sessionId: currentSessionId, adminToken: token });
         console.log('[Network] Sent end_session request to server.');
+        try {
+            localStorage.removeItem(`medicalMonitorDevice_${currentSessionId}_id`);
+            localStorage.removeItem(`medicalMonitorDevice_${currentSessionId}_token`);
+            localStorage.removeItem(`medicalMonitorAdminToken_${currentSessionId}`);
+        } catch (e) {}
     } catch (e) {
         console.error('[Network] Failed to send end_session request:', e);
         alert('Failed to send end session request.');
