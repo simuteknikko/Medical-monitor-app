@@ -6,6 +6,7 @@ const express = require('express');
 const http = require('http');
 const path = require('path');
 const WebSocket = require('ws');
+const crypto = require('crypto');
 
 const app = express();
 const server = http.createServer(app);
@@ -37,7 +38,8 @@ let keepAliveInterval = null; // Variable to hold the interval ID
 let sessionCleanupInterval = null;
 
 // TTL / cleanup settings for persisted sessions
-const SESSION_TTL_MS = parseInt(process.env.SESSION_TTL_MS) || 24 * 60 * 60 * 1000; // default 24 hours
+// By default do NOT auto-expire sessions (0 means no TTL). Set env SESSION_TTL_MS>0 to enable cleanup.
+const SESSION_TTL_MS = process.env.SESSION_TTL_MS ? parseInt(process.env.SESSION_TTL_MS) : 0; // 0 = never expire
 const SESSION_CLEANUP_INTERVAL_MS = parseInt(process.env.SESSION_CLEANUP_INTERVAL_MS) || 60 * 60 * 1000; // default 1 hour
 
 // --- Helper Functions ---
@@ -71,6 +73,14 @@ function generateSessionId(length) {
 function generateAdminToken() {
     // Simple random token - sufficient for this minimal approach
     return Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
+}
+
+function generateDeviceToken() {
+    return crypto.randomBytes(32).toString('hex');
+}
+
+function hashToken(token) {
+    return crypto.createHash('sha256').update(String(token)).digest('hex');
 }
 
 /**
@@ -195,11 +205,24 @@ wss.on('connection', (ws, req) => {
                 const newSessionId = generateSessionId(SESSION_ID_LENGTH);
                 if (newSessionId) {
                     const adminToken = generateAdminToken();
-                    sessions[newSessionId] = { clients: new Set([ws]), adminToken: adminToken, createdAt: Date.now(), lastActiveAt: Date.now() };
+                    // Initialize devices map to track per-device tokens and metadata
+                    sessions[newSessionId] = { clients: new Set([ws]), adminToken: adminToken, devices: {}, createdAt: Date.now(), lastActiveAt: Date.now() };
                     ws.sessionId = newSessionId;
                     ws.role = null; // Role needs to be set explicitly
-                    console.log(`[Server] Client ${ws.clientId} created session: ${newSessionId} (admin token issued)`);
-                    sendMessage(ws, { type: 'session_created', sessionId: newSessionId, adminToken: adminToken });
+                    // create device entry for this creator
+                    try {
+                        const deviceId = `dev_${Date.now()}_${Math.random().toString(36).substring(2,8)}`;
+                        const deviceToken = generateDeviceToken();
+                        const deviceHash = hashToken(deviceToken);
+                        sessions[newSessionId].devices[deviceId] = { tokenHash: deviceHash, createdAt: Date.now(), lastSeen: Date.now(), revoked: false };
+                        ws.deviceId = deviceId;
+                        // Send device token back to client once (client should persist it securely)
+                        sendMessage(ws, { type: 'session_created', sessionId: newSessionId, adminToken: adminToken, deviceId: deviceId, deviceToken: deviceToken });
+                        console.log(`[Server] Client ${ws.clientId} created session: ${newSessionId} (admin token issued) and device ${deviceId}`);
+                    } catch (e) {
+                        // fallback if anything failed
+                        sendMessage(ws, { type: 'session_created', sessionId: newSessionId, adminToken: adminToken });
+                    }
                 } else {
                     sendMessage(ws, { type: 'error', message: 'Failed to create a unique session ID. Please try again.' });
                 }
@@ -226,18 +249,106 @@ wss.on('connection', (ws, req) => {
                     sessionObj.lastActiveAt = Date.now();
                     ws.sessionId = targetSessionId;
                     ws.role = null; // Role needs to be set explicitly
-                    console.log(`[Server] Client ${ws.clientId} joined session: ${targetSessionId}`);
-                    sendMessage(ws, { type: 'session_joined', sessionId: targetSessionId, admin: !!ws.isOwner });
+                    // create device record for this joining client and emit device token for client to persist
+                    try {
+                        const deviceId = `dev_${Date.now()}_${Math.random().toString(36).substring(2,8)}`;
+                        const deviceToken = generateDeviceToken();
+                        const deviceHash = hashToken(deviceToken);
+                        sessionObj.devices[deviceId] = { tokenHash: deviceHash, createdAt: Date.now(), lastSeen: Date.now(), revoked: false };
+                        ws.deviceId = deviceId;
+                        console.log(`[Server] Client ${ws.clientId} joined session: ${targetSessionId} as device ${deviceId}`);
+                        sendMessage(ws, { type: 'session_joined', sessionId: targetSessionId, admin: !!ws.isOwner, deviceId: deviceId, deviceToken: deviceToken });
+                    } catch (e) {
+                        console.warn('[Server] Failed to create device token for joining client', e);
+                        sendMessage(ws, { type: 'session_joined', sessionId: targetSessionId, admin: !!ws.isOwner });
+                    }
                 } else {
                     console.log(`[Server] Client ${ws.clientId} failed to join session: ${targetSessionId} (Not Found)`);
                     sendMessage(ws, { type: 'session_not_found', sessionId: targetSessionId });
                 }
                 break;
 
+            case 'rejoin_with_device':
+                // Allow client to reattach using previously issued deviceId + deviceToken
+                if (!sessionId || typeof sessionId !== 'string' || !parsedMessage.deviceId || !parsedMessage.deviceToken) {
+                    sendMessage(ws, { type: 'error', message: 'Invalid rejoin payload. deviceId and deviceToken required.' });
+                    return;
+                }
+                const sid = sessionId.toUpperCase();
+                const deviceId = parsedMessage.deviceId;
+                const deviceToken = parsedMessage.deviceToken;
+                const sessionForRejoin = sessions[sid];
+                if (!sessionForRejoin) { sendMessage(ws, { type: 'session_not_found', sessionId: sid }); return; }
+                const deviceRecord = sessionForRejoin.devices && sessionForRejoin.devices[deviceId];
+                if (!deviceRecord || deviceRecord.revoked) { sendMessage(ws, { type: 'error', message: 'Invalid or revoked device. Rejoin denied.' }); return; }
+                const providedHash = hashToken(deviceToken);
+                if (providedHash !== deviceRecord.tokenHash) {
+                    // possible replay or wrong token
+                    console.warn(`[Server] Device rejoin failed for ${deviceId} on session ${sid}: token hash mismatch.`);
+                    sendMessage(ws, { type: 'error', message: 'Device token invalid.' });
+                    return;
+                }
+                // Success: attach client to session and update lastSeen
+                cleanupClientConnection(ws);
+                sessionForRejoin.clients.add(ws);
+                ws.sessionId = sid;
+                ws.deviceId = deviceId;
+                ws.role = null;
+                deviceRecord.lastSeen = Date.now();
+                sessionForRejoin.lastActiveAt = Date.now();
+                console.log(`[Server] Client ${ws.clientId} rejoined session ${sid} as device ${deviceId}`);
+                sendMessage(ws, { type: 'session_rejoined', sessionId: sid, deviceId: deviceId });
+                break;
+
             case 'list_sessions':
-                // Return a lightweight list of known sessions (including empty/persisted ones)
+                // Return a lightweight list of sessions visible to the requester.
+                // Clients should supply optional credentials so the server only reveals sessions
+                // the client created or previously joined (device creds or admin token).
                 try {
-                    const list = Object.keys(sessions).map(id => {
+                    // Accept optional credentials from client to determine which sessions to reveal
+                    // Expected payload shape:
+                    // { devices: [{ sessionId, deviceId, deviceToken }], adminTokens: [{ sessionId, adminToken }] }
+                    const providedDevices = Array.isArray(parsedMessage.devices) ? parsedMessage.devices : [];
+                    const providedAdmins = Array.isArray(parsedMessage.adminTokens) ? parsedMessage.adminTokens : [];
+
+                    // Build lookup maps
+                    const adminLookup = {};
+                    providedAdmins.forEach(a => { if (a && a.sessionId && a.adminToken) adminLookup[a.sessionId] = a.adminToken; });
+
+                    const deviceLookup = {};
+                    providedDevices.forEach(d => {
+                        if (d && d.sessionId && d.deviceId && d.deviceToken) {
+                            deviceLookup[d.sessionId] = deviceLookup[d.sessionId] || [];
+                            deviceLookup[d.sessionId].push({ deviceId: d.deviceId, deviceToken: d.deviceToken });
+                        }
+                    });
+
+                    const list = Object.keys(sessions).filter(id => {
+                        const s = sessions[id];
+
+                        // 1) If the requester is currently attached to this session, include it
+                        if (ws.sessionId === id) return true;
+
+                        // 2) If an admin token for this session was provided and matches, include it
+                        if (adminLookup[id] && s.adminToken && adminLookup[id] === s.adminToken) return true;
+
+                        // 3) If any provided device credential matches stored device hash for this session, include it
+                        const devicesForSession = deviceLookup[id];
+                        if (Array.isArray(devicesForSession) && s.devices) {
+                            for (const dv of devicesForSession) {
+                                const stored = s.devices[dv.deviceId];
+                                if (stored && !stored.revoked) {
+                                    try {
+                                        const providedHash = hashToken(dv.deviceToken);
+                                        if (providedHash === stored.tokenHash) return true;
+                                    } catch (e) { /* ignore token/hash errors */ }
+                                }
+                            }
+                        }
+
+                        // Otherwise do not reveal this session
+                        return false;
+                    }).map(id => {
                         const s = sessions[id];
                         return {
                             sessionId: id,
@@ -247,10 +358,11 @@ wss.on('connection', (ws, req) => {
                             hasAdmin: !!s.adminToken
                         };
                     });
+
                     sendMessage(ws, { type: 'session_list', sessions: list });
                 } catch (e) {
-                    console.error('[Server] Error building session list:', e);
-                    sendMessage(ws, { type: 'error', message: 'Failed to build session list.' });
+                    console.error('[Server] Failed handling list_sessions:', e);
+                    sendMessage(ws, { type: 'session_list', sessions: [] });
                 }
                 break;
 
@@ -315,6 +427,40 @@ wss.on('connection', (ws, req) => {
                 broadcastToSession(ws.sessionId, { type: 'sound_state_update', soundState: soundState }, ws, 'monitor');
                 break;
             // --- LISÄYS LOPPUU ---
+
+            case 'list_devices':
+                if (!sessionId || typeof sessionId !== 'string') { sendMessage(ws, { type: 'error', message: 'Invalid or missing sessionId for list_devices.' }); return; }
+                const listSess = sessions[sessionId];
+                if (!listSess) { sendMessage(ws, { type: 'error', message: 'Session not found.' }); return; }
+                if (!ws.isOwner) { sendMessage(ws, { type: 'error', message: 'Only session owner may list devices.' }); return; }
+                const devicesList = Object.keys(listSess.devices || {}).map(did => {
+                    const d = listSess.devices[did];
+                    return { deviceId: did, createdAt: d.createdAt, lastSeen: d.lastSeen, revoked: !!d.revoked };
+                });
+                sendMessage(ws, { type: 'device_list', sessionId: sessionId, devices: devicesList });
+                break;
+
+            case 'revoke_device':
+                if (!sessionId || typeof sessionId !== 'string' || !parsedMessage.deviceId) { sendMessage(ws, { type: 'error', message: 'Invalid revoke_device payload.' }); return; }
+                const sess = sessions[sessionId];
+                if (!sess) { sendMessage(ws, { type: 'error', message: 'Session not found.' }); return; }
+                if (!ws.isOwner) { sendMessage(ws, { type: 'error', message: 'Only session owner may revoke devices.' }); return; }
+                const didToRevoke = parsedMessage.deviceId;
+                if (sess.devices && sess.devices[didToRevoke]) {
+                    sess.devices[didToRevoke].revoked = true;
+                    sess.devices[didToRevoke].revokedAt = Date.now();
+                    // Drop any connected clients that match this deviceId
+                    sess.clients.forEach(client => {
+                        if (client.deviceId === didToRevoke) {
+                            try { sendMessage(client, { type: 'device_revoked', sessionId: sessionId, deviceId: didToRevoke }); } catch (e) {}
+                            client.sessionId = null; client.deviceId = null; client.role = null;
+                        }
+                    });
+                    sendMessage(ws, { type: 'device_revoked_confirm', sessionId: sessionId, deviceId: didToRevoke });
+                } else {
+                    sendMessage(ws, { type: 'error', message: 'Device not found.' });
+                }
+                break;
 
             case 'end_session':
                 // Admin-only: requires adminToken in message
@@ -390,14 +536,17 @@ function startSessionCleanup() {
     sessionCleanupInterval = setInterval(() => {
         try {
             const now = Date.now();
-            Object.keys(sessions).forEach(id => {
-                const s = sessions[id];
-                const clientCount = s.clients ? s.clients.size : 0;
-                if (clientCount === 0 && s.lastActiveAt && (now - s.lastActiveAt) > SESSION_TTL_MS) {
-                    console.log(`[Server] Cleaning up stale session ${id} (lastActiveAt=${new Date(s.lastActiveAt).toISOString()}).`);
-                    try { delete sessions[id]; } catch (e) { console.error('[Server] Failed to delete stale session', id, e); }
-                }
-            });
+            // If TTL is not configured (0 or falsy) skip cleanup entirely.
+            if (SESSION_TTL_MS > 0) {
+                Object.keys(sessions).forEach(id => {
+                    const s = sessions[id];
+                    const clientCount = s.clients ? s.clients.size : 0;
+                    if (clientCount === 0 && s.lastActiveAt && (now - s.lastActiveAt) > SESSION_TTL_MS) {
+                        console.log(`[Server] Cleaning up stale session ${id} (lastActiveAt=${new Date(s.lastActiveAt).toISOString()}).`);
+                        try { delete sessions[id]; } catch (e) { console.error('[Server] Failed to delete stale session', id, e); }
+                    }
+                });
+            }
         } catch (e) { console.error('[Server] Error during session cleanup:', e); }
     }, SESSION_CLEANUP_INTERVAL_MS);
 }
