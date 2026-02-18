@@ -10,6 +10,19 @@ It is released under the **GPL 3.0 license**.
 
 **Copyright © 2026 Henry Alatyppö**
 
+## Support the Project
+
+This application runs on a **VPS with ongoing monthly costs**.  
+If you find this app useful and valuable for your work, education, or training, please consider supporting its **development and continued availability**.
+
+Support helps cover:
+- Server and infrastructure costs
+- Ongoing maintenance
+- Further development and improvements
+
+You can support the project via **GitHub Sponsors**.  
+Every contribution, no matter the size, is greatly appreciated.
+
 ## Monitor Modes
 
 The monitor supports two operating modes: **Standalone** and **Multi‑Device**.
