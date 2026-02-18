@@ -245,8 +245,20 @@ function _handleNibpStart(monitorInstance) {
     console.log("[_handleNibpStart] NIBP Start triggered.");
     const targetSys = ensureFinite(monitorInstance.targetParams.abp.sys, 0); const targetDia = ensureFinite(monitorInstance.targetParams.abp.dia, 0);
     let measuredSys, measuredDia, measuredMap; const measurementTime = new Date();
-    if (targetSys < 30 && targetDia < 20) { measuredSys = null; measuredDia = null; measuredMap = null; console.log("[_handleNibpStart] Simulating failed NIBP measurement due to low target ABP."); }
-    else { const sysNoise = (Math.random() - 0.5) * 6; const diaNoise = (Math.random() - 0.5) * 4; measuredSys = Math.round(targetSys + sysNoise); measuredDia = Math.round(targetDia + diaNoise); measuredDia = Math.max(0, measuredDia); measuredSys = Math.max(measuredDia + 5, measuredSys); measuredMap = (measuredSys > measuredDia) ? Math.round(measuredDia + (measuredSys - measuredDia) / 3) : null; }
+    if (targetSys < 30 && targetDia < 20) {
+        measuredSys = null;
+        measuredDia = null;
+        measuredMap = null;
+        console.log("[_handleNibpStart] Simulating failed NIBP measurement due to low target ABP.");
+    } else {
+        // Use exact user-specified ABP values for NIBP measurement (no random noise)
+        measuredSys = Math.round(targetSys);
+        measuredDia = Math.round(targetDia);
+        measuredDia = Math.max(0, measuredDia);
+        // Ensure systolic is at least a few mmHg above diastolic for plausibility
+        if (measuredSys <= measuredDia) measuredSys = measuredDia + 1;
+        measuredMap = (measuredSys > measuredDia) ? Math.round(measuredDia + (measuredSys - measuredDia) / 3) : null;
+    }
     monitorInstance.currentParams.nibp.sys = measuredSys; monitorInstance.currentParams.nibp.dia = measuredDia; monitorInstance.currentParams.nibp.map = measuredMap; monitorInstance.currentParams.nibp.timestamp = measurementTime;
     monitorInstance.targetParams.nibp.sys = measuredSys; monitorInstance.targetParams.nibp.dia = measuredDia; monitorInstance.targetParams.nibp.map = measuredMap; monitorInstance.targetParams.nibp.timestamp = measurementTime;
     monitorInstance.updateVitalsDisplay(); console.log("[_handleNibpStart] Local NIBP updated:", monitorInstance.currentParams.nibp);
