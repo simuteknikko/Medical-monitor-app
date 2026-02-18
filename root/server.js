@@ -38,8 +38,9 @@ let keepAliveInterval = null; // Variable to hold the interval ID
 let sessionCleanupInterval = null;
 
 // TTL / cleanup settings for persisted sessions
-// By default do NOT auto-expire sessions (0 means no TTL). Set env SESSION_TTL_MS>0 to enable cleanup.
-const SESSION_TTL_MS = process.env.SESSION_TTL_MS ? parseInt(process.env.SESSION_TTL_MS) : 0; // 0 = never expire
+// Default session TTL is 12 hours (in ms). Override with env SESSION_TTL_MS (ms).
+const DEFAULT_SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
+const SESSION_TTL_MS = process.env.SESSION_TTL_MS ? parseInt(process.env.SESSION_TTL_MS) : DEFAULT_SESSION_TTL_MS;
 const SESSION_CLEANUP_INTERVAL_MS = parseInt(process.env.SESSION_CLEANUP_INTERVAL_MS) || 60 * 60 * 1000; // default 1 hour
 
 // --- Helper Functions ---
