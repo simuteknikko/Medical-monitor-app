@@ -2,7 +2,7 @@
 
 My name is **Henry Alatyppö**, and I work as a **Simulation Technician** at Helsinki University Hospital.
 
-I started this project to provide a **free, simple, and accessible patient monitor simulation tool**. In my work, I have noticed that some large companies offer expensive enterprise solutions, but the features they provide are not always worth the cost. This project is my response to that gap.
+I started this project to provide a **free, simple, and accessible patient monitor simulation tool**. Through my work, I’ve seen a growing need for lightweight solutions that focus on practical use rather than complex, costly ecosystems. Many existing tools are powerful, but they can be difficult to access or overbuilt for everyday training needs. This project aims to offer a clear, focused alternative that prioritizes usability and openness.
 
 You can run the monitor application at **https://medicalmonitorsim.com**.  
 The app is **completely free**, and I intend to keep it that way.  
