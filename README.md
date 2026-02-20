@@ -23,6 +23,29 @@ Support helps cover:
 You can support the project via **GitHub Sponsors**.  
 Every contribution, no matter the size, is greatly appreciated.
 
+## Monitor Modes
+
+The application offers two flexible operating modes to suit different training scenarios and equipment setups.
+
+---
+
+### 🖥️ Standalone Mode
+
+**Best for: Quick demonstrations, single-user training, or testing**
+
+In Standalone Mode, both the **monitor display** and **control panel** run together on the same device and browser window.
+
+**How it works:**
+1. Open the application on your device
+2. Use the built-in controller to adjust vital signs (heart rate, blood pressure, SpO2, etc.)
+3. Click **"Update Vitals Monitor"** to apply changes
+4. The monitor display updates instantly to reflect the new values
+
+**Advantages:**
+- Simple setup — no additional devices required
+- Perfect for quick testing and individual practice
+- Ideal for demonstrations on a single screen
+
 ### 📱 Multi-Device Mode
 
 **Best for: Realistic simulation environments, classroom training, and multi-user scenarios**
