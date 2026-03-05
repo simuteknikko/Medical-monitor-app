@@ -9,7 +9,6 @@
   },
   "dependencies": {
     "express": "^4.17.1",
-    "prettier": "^3.8.1",
     "ws": "^8.17.0"
   },
   "engines": {
@@ -23,5 +22,8 @@
     "websockets"
   ],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "prettier": "^3.8.1"
+  }
 }
