@@ -1587,7 +1587,56 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       try {
-        this.currentParams = JSON.parse(JSON.stringify(this.targetParams));
+        // If there are unapplied edits, start from the last applied state so
+        // "Update Vitals" can still apply pending changes after activation.
+        const hasPendingBeforeStart = (() => {
+          if (
+            this.isEtco2UpdatePending ||
+            this.isSpo2UpdatePending ||
+            this.isAbpUpdatePending
+          ) {
+            return true;
+          }
+          if (!this.interpolationTargetParams) {
+            return false;
+          }
+          try {
+            const keysToCompare = [
+              "ecg",
+              "spo2",
+              "abp",
+              "etco2",
+              "temp",
+              "nibp",
+              "colors",
+              "alarms",
+            ];
+            for (const key of keysToCompare) {
+              const targetVal = this.targetParams?.[key];
+              const appliedVal = this.interpolationTargetParams?.[key];
+
+              if (key === "nibp") {
+                if ((targetVal?.visible ?? undefined) !== (appliedVal?.visible ?? undefined)) {
+                  return true;
+                }
+                continue;
+              }
+
+              if (JSON.stringify(targetVal) !== JSON.stringify(appliedVal)) {
+                return true;
+              }
+            }
+          } catch (e) {
+            console.warn("[startAnimation] Pending-change detection failed, defaulting to targetParams.", e);
+          }
+          return false;
+        })();
+
+        const runtimeSource = hasPendingBeforeStart && this.interpolationTargetParams
+          ? this.interpolationTargetParams
+          : this.targetParams;
+
+        this.currentParams = JSON.parse(JSON.stringify(runtimeSource));
         if (
           this.currentParams.ecg &&
           this.currentParams.ecg.rhythm &&
@@ -1608,9 +1657,7 @@ document.addEventListener("DOMContentLoaded", () => {
           this.currentParams.nibp.map = null;
           this.currentParams.nibp.timestamp = null;
         }
-        this.interpolationTargetParams = JSON.parse(
-          JSON.stringify(this.currentParams)
-        );
+        this.interpolationTargetParams = JSON.parse(JSON.stringify(this.currentParams));
 
         if (this.updateTimeoutId !== null) {
           clearTimeout(this.updateTimeoutId);
