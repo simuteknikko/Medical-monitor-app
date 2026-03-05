@@ -24,6 +24,17 @@ h1 {
   text-shadow: 1px 1px 4px rgba(0,0,0,0.3);
 }
 
+.about-inline summary {
+  list-style: none;
+}
+.about-inline summary::-webkit-details-marker {
+  display: none;
+}
+
+.about-content {
+  white-space: pre-wrap;
+}
+
 /* --- Monitorin kääre --- */
 .monitor-wrapper {
   max-width: 1050px;
