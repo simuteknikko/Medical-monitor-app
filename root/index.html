@@ -388,6 +388,35 @@
           Pending changes - Click "Update Vitals" to apply after selected
           delay.
         </div>
+
+        <!-- Consolidated parameter visibility toggles placed under action buttons -->
+        <div id="parameter-toggles-row" class="d-flex justify-content-center gap-3 mt-3 flex-wrap">
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input control-input" type="checkbox" role="switch" id="ecg-visibility-switch" checked />
+            <label class="form-check-label text-light" for="ecg-visibility-switch">Show ECG</label>
+          </div>
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input control-input" type="checkbox" role="switch" id="spo2-visibility-switch" checked />
+            <label class="form-check-label text-light" for="spo2-visibility-switch">Show SpO2</label>
+          </div>
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input control-input" type="checkbox" role="switch" id="abp-visibility-switch" checked />
+            <label class="form-check-label text-light" for="abp-visibility-switch">Show ABP</label>
+          </div>
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input control-input" type="checkbox" role="switch" id="nibp-visibility-switch" checked />
+            <label class="form-check-label text-light" for="nibp-visibility-switch">Show NIBP</label>
+          </div>
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input control-input" type="checkbox" role="switch" id="etco2-visibility-switch" checked />
+            <label class="form-check-label text-light" for="etco2-visibility-switch">Show ETCO2</label>
+          </div>
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input control-input" type="checkbox" role="switch" id="temp-visibility-switch" checked />
+            <label class="form-check-label text-light" for="temp-visibility-switch">Show TEMP</label>
+          </div>
+        </div>
+
         <div class="mt-3">
           <button id="owner-end-session-btn-app" class="btn btn-danger d-none">
             End Session (Owner)
@@ -480,11 +509,7 @@
           <div id="ecgControls" class="accordion-collapse collapse show" aria-labelledby="headingEcg"
             data-bs-parent="#controlAccordion">
             <div class="accordion-body">
-              <div class="form-check form-switch mb-3">
-                <input class="form-check-input control-input" type="checkbox" role="switch" id="ecg-visibility-switch"
-                  checked />
-                <label class="form-check-label text-light" for="ecg-visibility-switch">Show ECG on Monitor</label>
-              </div>
+              
               <hr class="border-secondary" />
               <div class="row mb-3">
                 <div class="col-md-6">
@@ -601,11 +626,7 @@
           <div id="spo2Controls" class="accordion-collapse collapse" aria-labelledby="headingSpo2"
             data-bs-parent="#controlAccordion">
             <div class="accordion-body">
-              <div class="form-check form-switch mb-3">
-                <input class="form-check-input control-input" type="checkbox" role="switch" id="spo2-visibility-switch"
-                  checked />
-                <label class="form-check-label text-light" for="spo2-visibility-switch">Show SpO2 on Monitor</label>
-              </div>
+              
               <hr class="border-secondary" />
               <div class="row mb-3">
                 <div class="col-md-6">
@@ -653,11 +674,7 @@
           <div id="bpControls" class="accordion-collapse collapse" aria-labelledby="headingBp"
             data-bs-parent="#controlAccordion">
             <div class="accordion-body">
-              <div class="form-check form-switch mb-3">
-                <input class="form-check-input control-input" type="checkbox" role="switch" id="abp-visibility-switch"
-                  checked />
-                <label class="form-check-label text-light" for="abp-visibility-switch">Show ABP on Monitor</label>
-              </div>
+              
               <hr class="border-secondary" />
               <h5 class="text-warning mb-3">
                 Arterial Blood Pressure (ABP) Waveform
@@ -712,11 +729,7 @@
                 </div>
               </div>
               <hr class="border-secondary mt-4" />
-              <div class="form-check form-switch mb-3">
-                <input class="form-check-input control-input" type="checkbox" role="switch" id="nibp-visibility-switch"
-                  checked />
-                <label class="form-check-label text-light" for="nibp-visibility-switch">Show NIBP on Monitor</label>
-              </div>
+              
               <hr class="border-secondary" />
               <h5 class="text-info mb-3">
                 Non-Invasive Blood Pressure (NIBP)
@@ -744,11 +757,7 @@
           <div id="etco2Controls" class="accordion-collapse collapse" aria-labelledby="headingEtco2"
             data-bs-parent="#controlAccordion">
             <div class="accordion-body">
-              <div class="form-check form-switch mb-3">
-                <input class="form-check-input control-input" type="checkbox" role="switch" id="etco2-visibility-switch"
-                  checked />
-                <label class="form-check-label text-light" for="etco2-visibility-switch">Show ETCO2 on Monitor</label>
-              </div>
+              
               <hr class="border-secondary" />
               <div class="row mb-3">
                 <div class="col-md-6">
@@ -823,11 +832,7 @@
           <div id="tempControls" class="accordion-collapse collapse" aria-labelledby="headingTemp"
             data-bs-parent="#controlAccordion">
             <div class="accordion-body">
-              <div class="form-check form-switch mb-3">
-                <input class="form-check-input control-input" type="checkbox" role="switch" id="temp-visibility-switch"
-                  checked />
-                <label class="form-check-label text-light" for="temp-visibility-switch">Show TEMP on Monitor</label>
-              </div>
+              
               <hr class="border-secondary" />
               <div class="row mb-3">
                 <div class="col-md-7">

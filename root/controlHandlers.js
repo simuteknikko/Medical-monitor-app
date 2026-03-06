@@ -758,12 +758,13 @@ function _applyPresetParameters(presetParamsToApply, monitorInstance) {
                 const newParamsFromRhythms = RHYTHM_PARAMS[newRhythmKey];
 
                 if (newParamsFromRhythms) {
-                    newTargetParams.ecg = {
-                        rhythm: newRhythmKey,
-                        params: JSON.parse(JSON.stringify(newParamsFromRhythms)),
-                        hr: 0,
-                        visible: ecgPreset.hasOwnProperty('visible') ? ecgPreset.visible : (monitorInstance.targetParams.ecg?.visible ?? true)
-                    };
+                        // Preserve existing visibility (do NOT apply visibility from preset)
+                        newTargetParams.ecg = {
+                            rhythm: newRhythmKey,
+                            params: JSON.parse(JSON.stringify(newParamsFromRhythms)),
+                            hr: 0,
+                            visible: monitorInstance.targetParams.ecg?.visible ?? true
+                        };
                     let hrSourceValue = ecgPreset.hr !== undefined ? ecgPreset.hr : newParamsFromRhythms.baseHR;
                     const { initialHR } = monitorInstance._calculateInitialHR(newTargetParams.ecg.params, hrSourceValue);
                     newTargetParams.ecg.hr = initialHR;
@@ -772,15 +773,25 @@ function _applyPresetParameters(presetParamsToApply, monitorInstance) {
                     newTargetParams.ecg = JSON.parse(JSON.stringify(monitorInstance.targetParams.ecg));
                 }
             } else if (paramKey === 'nibp') {
+                // Do not allow presets to control visibility of NIBP
                 newTargetParams.nibp = {
                     sys: null, dia: null, map: null, timestamp: null,
-                    visible: presetParams.nibp?.hasOwnProperty('visible') ? presetParams.nibp.visible : (monitorInstance.targetParams.nibp?.visible ?? true)
+                    visible: monitorInstance.targetParams.nibp?.visible ?? true
                 };
+                // If preset supplied other nibp fields (e.g., timestamps), merge them except 'visible'
+                if (presetParams.nibp && typeof presetParams.nibp === 'object') {
+                    const nibpCopy = JSON.parse(JSON.stringify(presetParams.nibp));
+                    if (nibpCopy.hasOwnProperty('visible')) delete nibpCopy.visible;
+                    newTargetParams.nibp = { ...newTargetParams.nibp, ...nibpCopy };
+                }
             } else if (paramKey === 'colors') {
                 newTargetParams.colors = { ...currentTargetColors, ...(presetParams.colors || {}) };
             } else if (typeof presetParams[paramKey] === 'object' && presetParams[paramKey] !== null) {
                  const base = monitorInstance.targetParams[paramKey] || {};
-                 newTargetParams[paramKey] = { ...base, ...presetParams[paramKey] };
+                 // Merge preset but ensure 'visible' from preset does not overwrite user's current visibility
+                 const presetCopy = JSON.parse(JSON.stringify(presetParams[paramKey]));
+                 if (presetCopy && typeof presetCopy === 'object' && presetCopy.hasOwnProperty('visible')) delete presetCopy.visible;
+                 newTargetParams[paramKey] = { ...base, ...presetCopy };
                 if (paramKey === 'abp') {
                     let sys = newTargetParams.abp.sys;
                     let dia = newTargetParams.abp.dia;
@@ -830,9 +841,25 @@ function _handleSavePreset(monitorInstance) {
     if (!presetName) { console.log("[_handleSavePreset] Save cancelled by user."); return; }
     const paramsToSave = {}; const sourceParams = monitorInstance.targetParams;
     for (const key in sourceParams) {
-        if (key === 'ecg') { paramsToSave.ecg = { rhythm: sourceParams.ecg.rhythm, hr: sourceParams.ecg.hr, visible: sourceParams.ecg.visible }; }
-        else if (key === 'nibp') { paramsToSave.nibp = { visible: sourceParams.nibp.visible }; }
-        else if (key !== 'params' && sourceParams[key] && typeof sourceParams[key] === 'object') { paramsToSave[key] = JSON.parse(JSON.stringify(sourceParams[key])); }
+        if (key === 'ecg') {
+            // Save rhythm and HR but do NOT save visibility - visibility is purely user-controlled
+            paramsToSave.ecg = { rhythm: sourceParams.ecg.rhythm, hr: sourceParams.ecg.hr };
+        } else if (key === 'nibp') {
+            // Do not persist visibility for NIBP either; save any other nibp fields if present
+            const nibpCopy = {};
+            if (sourceParams.nibp && typeof sourceParams.nibp === 'object') {
+                for (const k in sourceParams.nibp) {
+                    if (k === 'visible') continue;
+                    nibpCopy[k] = JSON.parse(JSON.stringify(sourceParams.nibp[k]));
+                }
+            }
+            if (Object.keys(nibpCopy).length > 0) paramsToSave.nibp = nibpCopy;
+        } else if (key !== 'params' && sourceParams[key] && typeof sourceParams[key] === 'object') {
+            // Deep copy but strip any `visible` flags so presets don't control visibility
+            const copy = JSON.parse(JSON.stringify(sourceParams[key]));
+            if (copy && typeof copy === 'object' && copy.hasOwnProperty('visible')) delete copy.visible;
+            paramsToSave[key] = copy;
+        }
     }
 
     // Save into currently selected case and persist to cache
