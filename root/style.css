@@ -199,6 +199,16 @@ h1 {
     box-shadow: 0 6px 15px rgba(0,0,0,0.35);
     transition: display 0.3s ease;
 }
+.parameter-toggles-row, #parameter-toggles-row {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.parameter-toggles-row .form-check, #parameter-toggles-row .form-check { margin-bottom: 0; }
+.parameter-toggles-row .form-check-label, #parameter-toggles-row .form-check-label { font-size: 0.95rem; color: #e9ecef; }
 .controls-area h2 { color: #f8f9fa; font-weight: 300; font-size: 1.6rem; }
 .accordion-button { background-color: #343a40; color: #f8f9fa; border-radius: 0 !important; border: 1px solid #495057; }
 .accordion-button:not(.collapsed) { background-color: #76c7c0; color: #1c1e22; }
