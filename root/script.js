@@ -147,7 +147,7 @@ const DEFAULT_COLORS = {
   ecgColor: "#00ff00",
   spo2Color: "#00ffff",
   abpColor: "#ff0000",
-  etco2Color: "#ffff00",
+  etco2Color: "#ffffff",
   nibpColor: "#ff0000",
   tempColor: "#ffc107",
 };
