@@ -402,8 +402,8 @@ body.fullscreen-active > .page-wrapper > .controls-area {
 }
 
 body.fullscreen-active .monitor-display {
-  width: min(100%, calc(100vh * 1.8));
-  max-width: calc(100vh * 1.8);
+  width: min(100%, calc(100vh * 1.7));
+  max-width: calc(100vh * 1.7);
     height: 100%;
     border: none !important;
     border-radius: 0 !important;
