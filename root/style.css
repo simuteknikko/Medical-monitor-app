@@ -402,12 +402,13 @@ body.fullscreen-active > .page-wrapper > .controls-area {
 }
 
 body.fullscreen-active .monitor-display {
-    width: 100%;
+  width: min(100%, calc(100vh * 1.7));
+  max-width: calc(100vh * 1.7);
     height: 100%;
     border: none !important;
     border-radius: 0 !important;
     padding: 5px !important; /* Pieni padding koko näytön sisällölle */
-    margin: 0 !important;
+  margin: 0 auto !important;
     display: grid;
     /* 5 riviä: 4 pääparametria ja 1 NIBP/TEMP-parille */
     /* Annetaan NIBP/TEMP-riville suhteellisesti vähemmän tilaa, mutta varmistetaan minimikorkeus */
